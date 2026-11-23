@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="images/posthog-hedgehog-evel.png" width="220" alt="A hedgehog in a flaming cape rides a motorcycle." />
+  <img src="images/stunthog-header.png" width="800" alt="A hedgehog in a flaming cape jumps a motorcycle over the StuntHog landscape." />
 </p>
 
 # StuntHog

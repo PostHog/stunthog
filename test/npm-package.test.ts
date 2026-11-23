@@ -50,7 +50,7 @@ test("npm package includes release checksums, no binaries or dependencies, and r
     assert.equal(manifest.bin.stunthog, "bin/stunthog.cjs");
     const readme = await readFile(join(output, "README.md"), "utf8");
     const images = `https://raw.githubusercontent.com/PostHog/stunthog/v${manifest.version}/images`;
-    assert.ok(readme.includes(`src="${images}/posthog-hedgehog-evel.png"`));
+    assert.ok(readme.includes(`src="${images}/stunthog-header.png"`));
     assert.equal(manifest.private, undefined);
     assert.equal(manifest.dependencies, undefined);
     assert.equal(manifest.optionalDependencies, undefined);
