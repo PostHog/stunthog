@@ -1,49 +1,47 @@
-![Agent eval](images/agent-eval-logo.png)
+<p align="center">
+  <img src="images/stunthog-header.png" width="800" alt="A hedgehog in a flaming cape jumps a motorcycle over the StuntHog landscape." />
+</p>
 
-# agent-eval
+# StuntHog
 
-agent-eval allows you to see how coding agents behave in specific environments and with specific prompts. At the core, you have evals, which allow you to specify a set of criteria of what agents are supposed to. Then you select which models and harnesses you'd like to test on, and which environment (project, repository, folder, etc...). Then, upon running, it spawns isolated agents on a copy of the provided workspace, and a judge evaluates whether the agent fulfilled the acceptance criteria.
-
-## Demo
-
-![Evaluation results with coding sessions, criteria, duration, and cost](images/demo1.png)
+StuntHog shows how coding agents complete a task. Give the agents a prompt and define the criteria for success. Choose the models, harnesses, and workspace. Each agent works in its own copy of the workspace. Open a session to see the agent’s tool calls and the judge’s decision for each criterion.
 
 ## Install
 
 ### npm
 
-Once the first npm release is published, install with Node.js 22 or later:
+After the first StuntHog release on npm, install the CLI with Node.js 22 or later.
 
 ```sh
-npm install -g @posthog/agent-eval
-agent-eval
+npm install -g @posthog/stunthog
+stunthog
 ```
 
 The npm install script downloads the matching executable archive from GitHub Releases and checks its SHA-256 before extracting it with the system's `tar` command. Install with internet access and npm lifecycle scripts enabled. The executable includes Bun and runs offline after installation. npm's global executable directory must be on your `PATH`.
 
-The npm launcher checks for a newer stable version on startup. Run `agent-eval --auto-update` to install an available update before starting, or set `AGENT_EVAL_AUTO_UPDATE=1` to opt in on every launch. You can also update manually with `npm install -g @posthog/agent-eval@latest`.
+The npm launcher checks for a newer stable version on startup. Run `stunthog --auto-update` to install an available update before startup. Set `STUNTHOG_AUTO_UPDATE=1` to do this on every launch. To update manually, run `npm install -g @posthog/stunthog@latest`.
 
-Run `npm uninstall -g @posthog/agent-eval` to remove the package and its `agent-eval` command from PATH. Updates and uninstall preserve `~/.agent-eval/`. Pending database migrations run when the updated app starts. Linux builds target glibc, and Windows builds target x64.
+Run `npm uninstall -g @posthog/stunthog` to remove the package and its `stunthog` command. Updates and uninstall preserve your data directory. StuntHog applies pending database migrations on startup. Linux builds target glibc. Windows builds target x64.
 
 ### Standalone executable
 
-Download the archive for your computer from the [latest release](https://github.com/PostHog/agent-eval/releases/latest):
+Download the archive for your computer from the [latest release](https://github.com/PostHog/stunthog/releases/latest):
 
 | Platform | Download |
 | --- | --- |
-| macOS Apple silicon | `agent-eval-darwin-arm64.tar.gz` |
-| macOS Intel | `agent-eval-darwin-x64.tar.gz` |
-| Linux ARM64 | `agent-eval-linux-arm64.tar.gz` |
-| Linux x64 | `agent-eval-linux-x64.tar.gz` |
-| Windows x64 | `agent-eval-windows-x64.zip` |
+| macOS Apple silicon | `stunthog-darwin-arm64.tar.gz` |
+| macOS Intel | `stunthog-darwin-x64.tar.gz` |
+| Linux ARM64 | `stunthog-linux-arm64.tar.gz` |
+| Linux x64 | `stunthog-linux-x64.tar.gz` |
+| Windows x64 | `stunthog-windows-x64.zip` |
 
-Extract the archive and run the `agent-eval-*` executable. It includes Bun, the server, database migrations, and the web app. You do not need to install a JavaScript runtime. The release also includes a SHA-256 checksum for each archive.
+Extract the archive and run the `stunthog-*` executable. It includes Bun, the server, database migrations, and the web app. You do not need to install a JavaScript runtime. The release also includes a SHA-256 checksum for each archive.
 
 The CLI starts the application at http://127.0.0.1:3100 and opens it. Use the same executable to view previous sessions. Press Ctrl+C to stop.
 
 ```sh
-./agent-eval-darwin-arm64 --port 3200 --no-open
-./agent-eval-darwin-arm64 --help
+./stunthog-darwin-arm64 --port 3200 --no-open
+./stunthog-darwin-arm64 --help
 ```
 
 ## Build from source
@@ -68,13 +66,11 @@ The `v*` tag workflow builds and publishes the five standalone executables to Gi
 
 The development package stays private. Run `bun run package:npm <release-assets-directory>` to generate the publishable launcher, installer, and checksums in `release/npm`. The input directory must contain all five release archive checksum files. To inspect the package locally, run `npm pack ./release/npm --pack-destination release`.
 
-An npm package administrator must bootstrap `@posthog/agent-eval` if necessary, then configure its GitHub Actions trusted publisher for organization **PostHog**, repository **agent-eval**, workflow **release.yml**, environment **npm**, with direct publishing allowed. Create the matching **npm** environment in GitHub and allow release tags. The publishing job uses OIDC with `id-token: write`; no npm token secret is needed. See [npm's trusted publisher setup](https://docs.npmjs.com/trusted-publishers/).
-
 ### Application data
 
-Packaged releases save evals, resources, sessions, traces, files, judgments, and usage in `~/.agent-eval/agent-eval.db`. Runs from source use `~/.agent-eval/agent-eval_dev.db` instead. Existing databases are not moved or copied. Launching from different project folders uses the same database and settings. The CLI applies committed Prisma migrations on startup and prints the data directory it uses. Set `--data /path/to/directory` or `AGENT_EVAL_DATA_DIR` to use another directory; `--data` takes precedence.
+New installations store evaluations, sessions, resources, and settings in `~/.stunthog/stunthog.db`. Runs from source use `~/.stunthog/stunthog_dev.db`. The CLI prints the data directory on startup. Use `--data /path/to/directory` to select a directory for one launch. Set `STUNTHOG_DATA_DIR` to change the default. The command-line option takes precedence.
 
-Older versions stored data in each project's `.agent-eval/` directory. To keep that data, stop agent-eval and move the entire directory to `~/.agent-eval/`, including `credential.key`. If the home directory already has data, do not overwrite it: use `--data /path/to/project/.agent-eval` to open the older database separately. Existing databases are not automatically moved or merged. Old `runs/` folders are not imported.
+If you used an earlier release, StuntHog opens your existing home database in place. If both home directories contain a database for this runtime, StuntHog uses the one in `~/.stunthog/`. For an older project-local installation, pass its data directory to `--data`. Keep `credential.key` beside the database so StuntHog can read your saved credentials. Old `runs/` folders cannot be imported.
 
 No login is required. When analytics is configured, browser and backend events, logs, exceptions, and agent/judge traces use the same random anonymous installation ID stored in SQLite. The ID survives upgrades, restarts, browser changes, and localhost port changes. It contains no username or hardware fingerprint. Separate data directories have separate identities; copying a database also copies its identity.
 
@@ -91,9 +87,9 @@ The app uses the session concurrency limit in **Settings → General**. Each ses
 
 Under **Settings → General → Evaluation defaults**, configure the models and judge that prefill new evaluations, including their harness, effort, session count, timeout, and turn limit. Defaults are saved locally in SQLite. Existing evaluations keep their own configuration. Remove all default models or the judge if you prefer to choose them for each new evaluation.
 
-An environment can run on this computer or in Docker. Docker environments can use the inspectable built-in image, a local Dockerfile, or inline Dockerfile content. The app adds the selected native harness to the image, starts one container for each session, and mounts only that session's temporary files at `/agent-eval`. Pi shell commands, native harness processes, and MCP processes then run in that container. A custom image must include Node.js 22, npm, and a POSIX `sh` shell.
+An environment can run on this computer or in Docker. Docker environments can use the inspectable built-in image, a local Dockerfile, or inline Dockerfile content. The app adds the selected native harness to the image, starts one container for each session, and mounts only that session's temporary files at `/stunthog`. Pi shell commands, native harness processes, and MCP processes then run in that container. A custom image must include Node.js 22, npm, and a POSIX `sh` shell.
 
-Local folder and file fields accept a path or open the built-in filesystem picker. The picker reads paths from the machine that runs agent-eval.
+Local folder and file fields accept a path or open the built-in filesystem picker. The picker reads paths from the machine that runs StuntHog.
 
 The included `examples/Dockerfile.posthog-cli` installs a pinned PostHog CLI. Select it as the Dockerfile and use the Pi harness to test `posthog-cli` without installing the command on the host. Docker must be installed and running.
 
@@ -120,7 +116,7 @@ Timeouts use **seconds**. Effort support depends on the model and harness. Nativ
 
 ## Data and credentials
 
-UI keys are encrypted with AES-256-GCM. The encryption key is stored in `~/.agent-eval/credential.key` (or the selected data directory). Back up this file with the database. The UI never returns saved key values. A saved key overrides its environment variable. Removing it restores the environment fallback.
+StuntHog encrypts API keys with AES-256-GCM. It stores the encryption key in `credential.key` in the data directory. Back up this file with the database. The UI masks saved key values. A saved key takes precedence over its environment variable. Remove the saved key to use the environment variable again.
 
 Optional PostHog telemetry uses `POSTHOG_PROJECT_TOKEN` and `POSTHOG_HOST` on the server, and `VITE_PUBLIC_POSTHOG_KEY` and `VITE_PUBLIC_POSTHOG_HOST` in the web build. It records product actions, structured operational logs, and exceptions. Custom events do not include prompts, source files, transcripts, or provider credentials.
 

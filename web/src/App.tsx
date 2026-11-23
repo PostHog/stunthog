@@ -67,7 +67,7 @@ export function App() {
         >
           <header className="topbar">
             <a className="breadcrumb-link" href="#evals">
-              agent-eval
+              StuntHog
             </a>{" "}
             <span>/</span>{" "}
             {navigationGroups

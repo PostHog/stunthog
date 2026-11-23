@@ -85,11 +85,10 @@ export function CredentialsPage() {
         <CollapsibleTrigger>How keys are stored</CollapsibleTrigger>
         <CollapsibleContent>
           <p className="section-note">
-            agent-eval encrypts provider keys and stores them in SQLite. The
-            local data directory contains the encryption key. Make a backup of
-            both files together. The server reads provider keys from its
-            environment or its .env file. Restart the server if you change those
-            values.
+            StuntHog encrypts provider keys and stores them in SQLite. The local
+            data directory contains the encryption key. Make a backup of both
+            files together. The server reads provider keys from its environment
+            or its .env file. Restart the server if you change those values.
           </p>
         </CollapsibleContent>
       </Collapsible>

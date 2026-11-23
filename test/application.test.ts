@@ -14,8 +14,10 @@ import { ModelSettings } from "../src/evaluations/domain/model-settings.js";
 import { PrismaEvaluationRepository } from "../src/evaluations/infrastructure/prisma-evaluation-repository.js";
 import type { Harness } from "../src/harnesses/domain/harness.js";
 import type { HarnessRegistry } from "../src/harnesses/domain/harness-registry.js";
+import { SessionsController } from "../src/http/sessions-controller.js";
 import { Database } from "../src/infrastructure/database.js";
 import { migrateDatabase } from "../src/infrastructure/migrations.js";
+import type { ResponseRule } from "../src/overrides/domain/response-override.js";
 import { SessionQueue } from "../src/sessions/application/session-queue.js";
 import { SessionWorker } from "../src/sessions/application/session-worker.js";
 import { StartSessions } from "../src/sessions/application/start-sessions.js";
@@ -34,8 +36,8 @@ test(
 
 async function verifyApplicationPersistence() {
   const f = await fixture();
-  const data = await mkdtemp(join(tmpdir(), "agent-eval-database-"));
-  const previousDirectory = process.env.AGENT_EVAL_DATA_DIR;
+  const data = await mkdtemp(join(tmpdir(), "stunthog-database-"));
+  const previousDirectory = process.env.STUNTHOG_DATA_DIR;
   const previousUrl = process.env.DATABASE_URL;
 
   await migrateDatabase(data);
@@ -86,7 +88,18 @@ async function verifyApplicationPersistence() {
     const model = {
       ...ModelSettings.create({ model: "test-model", count: 2 }).value,
     };
+    const rule = {
+      id: crypto.randomUUID(),
+      target: { kind: "web" as const },
+      mode: "text" as const,
+      find: "old SDK",
+      replacement: "updated SDK",
+      inputContains: "",
+      outputContains: "",
+      path: "",
+    };
     const evaluation = await evals.save({
+      responseOverrides: [rule],
       title: "Install",
       prompt: "Change the app",
       criteria: [{ description: "App changed" }],
@@ -100,6 +113,7 @@ async function verifyApplicationPersistence() {
     await assert.rejects(catalog.delete("persona", persona.value.id));
 
     let judgeCalls = 0;
+    let expectedRules: ResponseRule[] = [rule];
     const adapter: Harness = {
       id: "pi",
       title: "Test",
@@ -111,8 +125,12 @@ async function verifyApplicationPersistence() {
       run: async (input) => {
         await input.onRawEvent({ type: "test", label: input.label });
 
-        if (input.label === "judge") judgeCalls++;
-        else {
+        if (input.label === "judge") {
+          assert.equal(input.responseOverrides, undefined);
+          assert.equal(input.onToolResponse, undefined);
+          judgeCalls++;
+        } else {
+          assert.deepEqual(input.responseOverrides, expectedRules);
           assert.match(input.persona ?? "", /Verify all changes/);
           assert.equal(
             await readFile(join(input.workspace, "app.ts"), "utf8"),
@@ -227,10 +245,28 @@ async function verifyApplicationPersistence() {
       new SessionQueue(),
     );
 
-    await starter.start(evaluation.id);
+    const baseline = await starter.start(evaluation.id);
     await starter.onModuleDestroy();
 
-    // A shutdown cancels active work. Start another batch and wait for its independent judgments.
+    const shellRule: ResponseRule = {
+      ...rule,
+      id: crypto.randomUUID(),
+      target: {
+        kind: "shell",
+        match: "command",
+        command: "grep posthog package.json",
+      },
+    };
+    const withShell = await evals.addOverride(evaluation.id, shellRule);
+    assert.equal(
+      (await evals.addOverride(evaluation.id, shellRule)).revision,
+      withShell.revision,
+    );
+    expectedRules = [rule, shellRule];
+    const oldSession = await db.session.findFirstOrThrow({
+      where: { batchId: baseline.batchId },
+    });
+    assert.ok(!JSON.stringify(oldSession.snapshot).includes(shellRule.id));
     const batch = await starter.start(evaluation.id);
 
     for (let attempt = 0; attempt < 500; attempt++) {
@@ -281,20 +317,27 @@ async function verifyApplicationPersistence() {
     assert.equal(duplicate.prompt, evaluation.prompt);
     assert.deepEqual(duplicate.models, evaluation.models);
     assert.deepEqual(duplicate.skillIds, evaluation.skillIds);
+    assert.notEqual(duplicate.responseOverrides?.[0]?.id, rule.id);
+    assert.equal(
+      duplicate.responseOverrides?.[0]?.replacement,
+      rule.replacement,
+    );
     assert.notEqual(duplicate.criteria[0]?.id, evaluation.criteria[0]?.id);
     assert.equal(
       await db.session.count({ where: { evalId: duplicate.id } }),
       0,
     );
 
-    const { id: _id, ...revision } = evaluation;
+    const { id: _id, ...revision } = withShell;
 
     const revised = await evals.save(
-      { ...revision, prompt: "A revised prompt" },
+      { ...revision, prompt: "A revised prompt", responseOverrides: [] },
       evaluation.id,
     );
 
-    assert.equal(revised.revision, 2);
+    assert.equal(revised.revision, withShell.revision + 1);
+    assert.deepEqual(revised.responseOverrides, []);
+    assert.match(JSON.stringify(saved[0]?.snapshot), /updated SDK/);
 
     await assert.rejects(evals.save(revision, evaluation.id), /changed/);
 
@@ -308,11 +351,42 @@ async function verifyApplicationPersistence() {
     const app = await NestFactory.create(ApplicationModule, { logger: false });
 
     await app.init();
-    await app.close();
+    try {
+      const controller = app.get(SessionsController);
+      const s = saved[0];
+      assert.ok(s);
+      const capture = {
+        callId: "c1",
+        route: "web_fetch",
+        target: rule.target,
+        args: {},
+        original: "old SDK",
+      };
+      assert.equal((await controller.get(s.id)).interceptedCalls, 0);
+      await sessions.event(s.id, "response", capture);
+      await sessions.event(s.id, "response", {
+        ...capture,
+        callId: "error",
+        error: "Failed to apply rule",
+      });
+      await sessions.event(s.id, "judge", { ...capture, ruleId: rule.id });
+      for (const callId of ["c1", "c1", "c2"])
+        await sessions.event(s.id, "response", {
+          ...capture,
+          callId,
+          ruleId: rule.id,
+          delivered: "updated SDK",
+        });
+      assert.equal((await controller.get(s.id)).interceptedCalls, 2);
+      for (const row of await controller.list(evaluation.id))
+        assert.equal(row.interceptedCalls, row.id === s.id ? 2 : 0);
+    } finally {
+      await app.close();
+    }
   } finally {
     await db.$disconnect();
-    if (previousDirectory === undefined) delete process.env.AGENT_EVAL_DATA_DIR;
-    else process.env.AGENT_EVAL_DATA_DIR = previousDirectory;
+    if (previousDirectory === undefined) delete process.env.STUNTHOG_DATA_DIR;
+    else process.env.STUNTHOG_DATA_DIR = previousDirectory;
     if (previousUrl === undefined) delete process.env.DATABASE_URL;
     else process.env.DATABASE_URL = previousUrl;
     await rm(data, { recursive: true, force: true });

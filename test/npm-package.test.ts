@@ -10,7 +10,7 @@ import { packageNpm } from "../scripts/package-npm.js";
 
 const require = createRequire(import.meta.url);
 const { binaries, binaryName, isNewerVersion } =
-  require("../npm/agent-eval.cjs") as {
+  require("../npm/stunthog.cjs") as {
     binaries: Record<string, string>;
     binaryName: (platform: string, architecture: string) => string;
     isNewerVersion: (latest: string, installed: string) => boolean;
@@ -26,7 +26,7 @@ test("update checks only offer newer stable npm versions", () => {
 });
 
 test("npm package includes release checksums, no binaries or dependencies, and rejects incomplete releases", async () => {
-  const root = await mkdtemp(join(tmpdir(), "agent-eval-npm-"));
+  const root = await mkdtemp(join(tmpdir(), "stunthog-npm-"));
   const output = join(root, "package");
   try {
     await assert.rejects(packageNpm(root, output), /ENOENT/);
@@ -46,8 +46,11 @@ test("npm package includes release checksums, no binaries or dependencies, and r
     const manifest = JSON.parse(
       await readFile(join(output, "package.json"), "utf8"),
     );
-    assert.equal(manifest.name, "@posthog/agent-eval");
-    assert.equal(manifest.bin["agent-eval"], "bin/agent-eval.cjs");
+    assert.equal(manifest.name, "@posthog/stunthog");
+    assert.equal(manifest.bin.stunthog, "bin/stunthog.cjs");
+    const readme = await readFile(join(output, "README.md"), "utf8");
+    const images = `https://raw.githubusercontent.com/PostHog/stunthog/v${manifest.version}/images`;
+    assert.ok(readme.includes(`src="${images}/stunthog-header.png"`));
     assert.equal(manifest.private, undefined);
     assert.equal(manifest.dependencies, undefined);
     assert.equal(manifest.optionalDependencies, undefined);
@@ -62,10 +65,7 @@ test("npm package includes release checksums, no binaries or dependencies, and r
     assert.deepEqual(Object.keys(checksums).sort(), archives.sort());
     assert.equal(archives.length, 5);
     assert.throws(() => binaryName("win32", "arm64"), /does not support/);
-    await writeFile(
-      join(root, "agent-eval-linux-x64.tar.gz.sha256"),
-      "invalid",
-    );
+    await writeFile(join(root, "stunthog-linux-x64.tar.gz.sha256"), "invalid");
     await assert.rejects(packageNpm(root, output), /Invalid checksum/);
   } finally {
     await rm(root, { recursive: true, force: true });
@@ -74,7 +74,7 @@ test("npm package includes release checksums, no binaries or dependencies, and r
 
 test("npm launcher forwards arguments, terminal IO, signals, exit codes, and spawn errors", async () => {
   const source = await readFile(
-    new URL("../npm/agent-eval.cjs", import.meta.url),
+    new URL("../npm/stunthog.cjs", import.meta.url),
     "utf8",
   );
   const child = new EventEmitter();
@@ -89,7 +89,7 @@ test("npm launcher forwards arguments, terminal IO, signals, exit codes, and spa
     "lib",
     "node_modules",
     "@posthog",
-    "agent-eval",
+    "stunthog",
   );
   let latest: string | undefined;
   const args = ["--data", "folder with spaces", "--port", "3210"];
@@ -111,7 +111,7 @@ test("npm launcher forwards arguments, terminal IO, signals, exit codes, and spa
         spawn: (file: string, args: string[], options: { stdio: string }) => {
           assert.equal(
             file,
-            join(packageRoot, "binaries", "agent-eval-linux-x64"),
+            join(packageRoot, "binaries", "stunthog-linux-x64"),
           );
           assert.deepEqual(Array.from(args), [
             "--data",
@@ -147,7 +147,7 @@ test("npm launcher forwards arguments, terminal IO, signals, exit codes, and spa
       fetch: async (url: string) => {
         assert.equal(
           url,
-          "https://registry.npmjs.org/@posthog%2fagent-eval/latest",
+          "https://registry.npmjs.org/@posthog%2fstunthog/latest",
         );
         if (!latest) throw new Error("offline");
         return Response.json({ version: latest });
@@ -171,9 +171,9 @@ test("npm launcher forwards arguments, terminal IO, signals, exit codes, and spa
   child.removeAllListeners();
   fakeProcess.argv.splice(2, 0, "--auto-update");
   await launch();
-  assert.equal(installs[0]?.at(-1), "@posthog/agent-eval@0.1.5");
+  assert.equal(installs[0]?.at(-1), "@posthog/stunthog@0.1.5");
   child.emit("error", new Error("ENOENT"));
   child.emit("close", -2, null);
-  assert.match(notice.at(-1) ?? "", /Could not start agent-eval: ENOENT/);
+  assert.match(notice.at(-1) ?? "", /Could not start StuntHog: ENOENT/);
   assert.notEqual(fakeProcess.exitCode, 0);
 });

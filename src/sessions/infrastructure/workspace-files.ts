@@ -9,6 +9,7 @@ const excluded = new Set([
   ".codex",
   ".env",
   ".next",
+  ".stunthog",
   ".agent-eval",
 ]);
 export function contains(parent: string, child: string): boolean {

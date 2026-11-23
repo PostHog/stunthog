@@ -19,12 +19,12 @@ test(
   "installation identity survives restart and concurrent access, and differs between databases",
   { timeout: 30000 },
   async () => {
-    const root = await mkdtemp(join(tmpdir(), "agent-eval-identity-"));
-    const previousDirectory = process.env.AGENT_EVAL_DATA_DIR;
+    const root = await mkdtemp(join(tmpdir(), "stunthog-identity-"));
+    const previousDirectory = process.env.STUNTHOG_DATA_DIR;
     const previousUrl = process.env.DATABASE_URL;
     const databases: Database[] = [];
     try {
-      const productionPath = join(root, "first", "agent-eval.db");
+      const productionPath = join(root, "first", "stunthog.db");
       await mkdir(join(root, "first"));
       await writeFile(productionPath, "existing production database");
       await migrateDatabase(join(root, "first"));
@@ -34,7 +34,7 @@ test(
       );
       assert.equal(
         process.env.DATABASE_URL,
-        `file:${join(root, "first", "agent-eval_dev.db")}`,
+        `file:${join(root, "first", "stunthog_dev.db")}`,
       );
       const first = new Database();
       databases.push(first);
@@ -57,9 +57,8 @@ test(
       assert.notEqual(await loadInstallationId(second), distinctId);
     } finally {
       for (const database of databases) await database.$disconnect();
-      if (previousDirectory === undefined)
-        delete process.env.AGENT_EVAL_DATA_DIR;
-      else process.env.AGENT_EVAL_DATA_DIR = previousDirectory;
+      if (previousDirectory === undefined) delete process.env.STUNTHOG_DATA_DIR;
+      else process.env.STUNTHOG_DATA_DIR = previousDirectory;
       if (previousUrl === undefined) delete process.env.DATABASE_URL;
       else process.env.DATABASE_URL = previousUrl;
       await rm(root, { recursive: true, force: true });

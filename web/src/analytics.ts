@@ -27,7 +27,7 @@ export async function initializeAnalytics(): Promise<void> {
       bootstrap: { distinctID: distinctId, isIdentifiedID: false },
       person_profiles: "always",
       capture_exceptions: true,
-      logs: { captureConsoleLogs: true, serviceName: "agent-eval-frontend" },
+      logs: { captureConsoleLogs: true, serviceName: "stunthog-frontend" },
     });
     analyticsEnabled = true;
   } catch {

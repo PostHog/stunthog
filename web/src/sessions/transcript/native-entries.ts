@@ -1,3 +1,4 @@
+import { toolResponseId } from "../../../../src/sessions/domain/tool-call.js";
 import {
   blocksText,
   record,
@@ -42,6 +43,16 @@ export function nativeEntries(
           item.type === "command_execution"
             ? "shell"
             : String(item.tool ?? item.type).replaceAll("_", " "),
+        name:
+          item.type === "command_execution"
+            ? "command_execution"
+            : string(item.tool),
+        server: string(item.server),
+        args:
+          item.type === "command_execution"
+            ? { command: string(item.command) }
+            : record(item.arguments),
+        responseId: toolResponseId(item.result),
         text:
           string(item.command ?? item.query) ||
           (item.changes
@@ -82,6 +93,8 @@ export function nativeEntries(
         id: `tool-${String(part.callID ?? part.id ?? sequence)}`,
         kind: toolKind(name),
         title: name,
+        name,
+        args: record(state.input),
         text: toolText(state.input) || string(state.title),
         output: string(state.output ?? state.error),
         status:

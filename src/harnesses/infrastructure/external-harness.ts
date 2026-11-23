@@ -1,5 +1,6 @@
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { prepareResponseTools } from "../../overrides/infrastructure/native-tools.js";
 import type {
   Harness,
   HarnessInput,
@@ -39,8 +40,14 @@ export class ExternalHarness implements Harness {
       ...(input.mcps ?? []).map((server) => server.accessToken),
     ].filter((secret): secret is string => Boolean(secret));
 
+    let prepared: Awaited<ReturnType<typeof prepareResponseTools>> | undefined;
     try {
-      const localCommand = await externalCommand(this.id, input);
+      prepared = await prepareResponseTools(input);
+      const localCommand = await externalCommand(
+        this.id,
+        prepared.input,
+        prepared.shellHook,
+      );
       const command = input.runtime
         ? await input.runtime.process(localCommand, input.workspace)
         : localCommand;
@@ -90,6 +97,7 @@ export class ExternalHarness implements Harness {
       );
     }
 
+    await prepared?.finish();
     const result = summarizeEvents(events);
     const error =
       (result.error

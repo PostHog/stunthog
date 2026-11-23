@@ -37,7 +37,7 @@ export function Notice({ error }: { error?: string }) {
       <StatusIcon name="error" />
       <span>
         {error.includes("Failed to fetch")
-          ? "Cannot connect to the local server. Start agent-eval. Then try again."
+          ? "Cannot connect to the local server. Start StuntHog. Then try again."
           : error.replace(/^(Error|TypeError): /, "")}
       </span>
     </p>

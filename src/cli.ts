@@ -10,7 +10,7 @@ loadEnvironment();
 try {
   await CommandFactory.runWithoutClosing(CliModule, {
     logger: ["error"],
-    cliName: "agent-eval",
+    cliName: "stunthog",
   });
 } catch (error) {
   console.error(error instanceof Error ? error.message : String(error));

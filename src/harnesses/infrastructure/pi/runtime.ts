@@ -12,11 +12,42 @@ import {
   SettingsManager,
   type ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
+import { deliverShellResponse } from "../../../overrides/infrastructure/deliver.js";
 import type { HarnessRequest } from "../../domain/execution.js";
 import { writeJson } from "./json-file.js";
 import { connectMcpTools } from "./mcp-tools.js";
 import { createResources } from "./resources.js";
-import { webFetchTool } from "./web.js";
+import { webTool } from "./web.js";
+
+export function sessionBash(request: HarnessRequest) {
+  const runtime = request.runtime;
+  const bash = createBashToolDefinition(
+    request.workspace,
+    runtime ? { operations: { exec: runtime.shell.bind(runtime) } } : undefined,
+  );
+  const rules = request.responseOverrides?.filter(
+    (rule) => rule.target.kind === "shell",
+  );
+  if (!rules?.length || request.label === "judge") return bash;
+  const execute = bash.execute;
+  bash.execute = async (id, params, ...rest) => {
+    const result = await execute(id, params, ...rest);
+    // Pi returns one text block for the completed shell command, including any truncation notice.
+    const block = result.content[0];
+    if (block?.type === "text" && result.content.length === 1) {
+      const text = await deliverShellResponse(
+        rules,
+        params.command,
+        block.text,
+        id,
+        request.onToolResponse,
+      );
+      return { ...result, content: [{ ...block, text }] };
+    }
+    return result;
+  };
+  return bash;
+}
 
 export async function createSession(request: HarnessRequest) {
   const agentDir = join(request.directory, "pi");
@@ -52,9 +83,7 @@ export async function createSession(request: HarnessRequest) {
     request.runtime?.kind === "docker"
       ? ([
           createReadToolDefinition(request.workspace),
-          createBashToolDefinition(request.workspace, {
-            operations: { exec: request.runtime.shell.bind(request.runtime) },
-          }),
+          sessionBash(request),
           createEditToolDefinition(request.workspace),
           createWriteToolDefinition(request.workspace),
           createLsToolDefinition(request.workspace),
@@ -75,7 +104,12 @@ export async function createSession(request: HarnessRequest) {
     tools: [...selectedTools, ...mcp.tools.map((tool) => tool.name)],
     customTools: [
       ...dockerTools,
-      ...(selectedTools.includes("web_fetch") ? [webFetchTool] : []),
+      ...(request.runtime?.kind !== "docker" &&
+      selectedTools.includes("bash") &&
+      request.responseOverrides?.some((r) => r.target.kind === "shell")
+        ? [sessionBash(request) as unknown as ToolDefinition]
+        : []),
+      ...(selectedTools.includes("web_fetch") ? [webTool(request)] : []),
       ...mcp.tools,
     ],
     settingsManager,

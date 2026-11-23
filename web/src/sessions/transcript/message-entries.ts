@@ -1,3 +1,4 @@
+import { toolResponseId } from "../../../../src/sessions/domain/tool-call.js";
 import {
   blocksText,
   record,
@@ -26,6 +27,8 @@ export function messageEntries(
         id: `tool-${String(event.toolCallId ?? sequence)}`,
         kind: toolKind(name),
         title: name,
+        name,
+        ...(event.args !== undefined && { args: record(event.args) }),
         text: toolText(event.args),
         output: blocksText(record(event.result).content),
         status:
@@ -60,6 +63,8 @@ export function messageEntries(
           id: `tool-${String(block.id)}`,
           kind: toolKind(name),
           title: name,
+          name,
+          args: record(block.input),
           text: toolText(block.input),
           status: "running",
         },
@@ -70,6 +75,10 @@ export function messageEntries(
         {
           ...base,
           id: `tool-${String(block.tool_use_id)}`,
+          responseId:
+            content.length === 1
+              ? toolResponseId(event.tool_use_result)
+              : undefined,
           kind: "tool",
           text: "",
           output: blocksText(block.content),

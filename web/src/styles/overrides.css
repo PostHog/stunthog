@@ -1,0 +1,535 @@
+.override-dialog[data-size="wide"] {
+  --quill-dialog-top-gap: clamp(10px, 4dvh, 48px);
+  width: 94vw;
+  max-width: 112rem;
+}
+.override-dialog .quill-dialog__header {
+  gap: 4px;
+}
+.override-dialog .quill-dialog__title {
+  margin: 0;
+  font-size: 18px;
+}
+.override-dialog .quill-dialog__description {
+  margin: 0;
+  font-size: 13px;
+}
+.override-dialog .quill-dialog__footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-block: 12px;
+}
+.override-footer-start {
+  margin-inline-end: auto;
+}
+.override-dialog .dialog-body {
+  padding: 0;
+}
+.call-search {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.call-browser {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+  align-items: start;
+}
+.call-browser {
+  height: clamp(17rem, 62dvh, 52rem);
+  align-items: stretch;
+  border-top: 1px solid var(--border);
+}
+.call-history,
+.call-inspector {
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+.call-history {
+  padding: 12px 12px 6px 0;
+}
+.call-history > h3 {
+  font-size: 13px;
+  margin: 0 8px 6px;
+}
+.call-history > output,
+.call-history > p {
+  display: block;
+  padding: 12px 8px;
+}
+.call-example {
+  display: grid;
+  gap: 3px;
+  padding: 9px 10px;
+  border-radius: 4px;
+  width: 100%;
+  color: var(--foreground);
+  text-align: start;
+  cursor: pointer;
+}
+.call-example + .call-example {
+  margin-top: 2px;
+}
+.call-example:hover {
+  background: var(--fill-hover);
+}
+.call-example[aria-pressed="true"] {
+  background: var(--fill-selected);
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+.call-example:focus-visible {
+  outline-offset: -2px;
+}
+.call-type {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  overflow-wrap: anywhere;
+  font-weight: 600;
+}
+.call-type svg {
+  flex-shrink: 0;
+  color: var(--info-foreground);
+}
+.call-type time {
+  flex-shrink: 0;
+  margin-left: auto;
+  font-weight: 400;
+}
+.call-type time,
+.call-example small,
+.call-excerpt {
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+.call-example code,
+.call-example small,
+.call-excerpt {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.call-excerpt > span {
+  font-weight: 600;
+  margin-inline-end: 4px;
+}
+.call-example code {
+  font: 12px / 1.6 var(--font-mono);
+}
+.call-inspector {
+  border-left: 1px solid var(--border);
+  padding: 16px 4px 12px 20px;
+}
+.call-inspector-title,
+.call-provenance {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 12px;
+}
+.call-inspector-title h3 {
+  font-size: 17px;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.call-inspector-title > span {
+  text-transform: capitalize;
+  font-size: 12px;
+}
+.call-inspector p {
+  margin: 3px 0;
+  overflow-wrap: anywhere;
+}
+.call-provenance {
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+.call-inspector h4 {
+  display: block;
+  font-weight: 600;
+  margin: 16px 0 5px;
+}
+.call-inspector pre,
+.override-dialog details pre {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 4px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  font: 12px / 1.6 var(--font-mono);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.call-task summary {
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+.call-task p {
+  white-space: pre-wrap;
+}
+.call-inspector .call-sample-note {
+  color: var(--muted-foreground);
+  margin-top: 12px;
+}
+.override-form {
+  display: grid;
+  gap: 12px;
+}
+.override-workbar,
+.override-call-context,
+.override-call-title,
+.override-workspace-heading,
+.response-pane header,
+.override-scope > summary,
+.override-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.override-workbar,
+.override-workspace-heading,
+.response-pane header {
+  justify-content: space-between;
+}
+.override-call-context,
+.override-call-context > div,
+.override-call-title code {
+  min-width: 0;
+}
+.override-call-context small,
+.call-input-details,
+.response-pane header span,
+.override-status,
+.override-scope summary span {
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+.override-call-title code {
+  font: 12px var(--font-mono);
+  color: var(--info-foreground);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.override-tool-icon {
+  display: grid;
+  place-items: center;
+  min-width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  background: var(--accent);
+}
+.override-tool-icon svg {
+  width: 17px;
+  height: 17px;
+}
+.override-form summary {
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+.override-workbar > button {
+  flex-shrink: 0;
+}
+.call-input-details {
+  margin: -8px 0 0 42px;
+}
+.call-input-details pre {
+  max-height: 18dvh;
+  overflow: auto;
+  margin-block: 6px;
+}
+.override-workspace {
+  border-top: 1px solid var(--border);
+  padding-top: 14px;
+}
+.override-workspace-heading {
+  align-items: start;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+.response-pane h3 {
+  margin: 0;
+}
+.override-pattern {
+  margin-bottom: 14px;
+}
+.override-fields,
+.override-conditions[open],
+.override-target-settings .form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 16px;
+}
+.override-fields {
+  margin-top: 8px;
+}
+.override-pattern textarea {
+  font-family: var(--font-mono);
+}
+.override-pattern p,
+.override-target-settings p {
+  font-size: 12px;
+  margin: 6px 0;
+}
+.manual-sample {
+  margin-bottom: 12px;
+}
+.response-comparison {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  overflow: hidden;
+}
+.response-pane {
+  min-width: 0;
+}
+.response-pane[data-side="after"] {
+  border-inline-start: 1px solid var(--border);
+}
+.response-pane header {
+  background: var(--card);
+  border-block-end: 1px solid var(--border);
+  padding: 10px 16px;
+}
+.response-pane h3 {
+  font-size: 13px;
+}
+.response-pane[data-side="after"] header {
+  background: color-mix(in srgb, var(--success-foreground) 7%, var(--card));
+}
+.response-pane[data-side="after"] header h3 {
+  color: var(--success-foreground);
+}
+.response-direction {
+  position: absolute;
+  inset: 7px auto auto 50%;
+  transform: translateX(-50%);
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--background);
+  color: var(--muted-foreground);
+}
+.response-pane:first-child header {
+  padding-inline-end: 23px;
+}
+.response-pane[data-side="after"] header {
+  padding-inline-start: 22px;
+}
+.response-pane .cm-editor {
+  height: clamp(12rem, 42dvh, 40rem);
+}
+.response-pane .cm-scroller {
+  overflow: auto;
+  font: 13px / 1.65 var(--font-mono);
+}
+.response-pane .cm-content {
+  padding: 12px 6px;
+  caret-color: var(--foreground);
+}
+.response-pane .cm-gutters {
+  background: transparent;
+  color: var(--muted-foreground);
+  border: none;
+  padding: 0 4px;
+}
+.response-pane .cm-focused {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--info-foreground);
+}
+.response-pane .cm-cursor {
+  border-left-color: var(--foreground);
+}
+.response-pane .diff-remove {
+  color: var(--destructive-foreground);
+  background: var(--destructive);
+  text-decoration: line-through;
+}
+.response-pane .diff-add {
+  color: var(--success-foreground);
+  background: var(--success);
+  text-decoration: underline;
+}
+.override-status {
+  min-height: 22px;
+  margin-top: 6px;
+  gap: 6px;
+}
+.override-status[data-changed="true"] {
+  color: var(--success-foreground);
+}
+.override-status[data-error="true"] {
+  color: var(--destructive-foreground);
+}
+.override-scope {
+  min-width: 0;
+  flex: 1;
+}
+.override-scope > summary {
+  padding-block: 10px;
+}
+.override-scope > summary::-webkit-details-marker {
+  display: none;
+}
+.override-scope > summary::after {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(45deg) translateY(-2px);
+}
+.override-scope[open] > summary::after {
+  transform: rotate(225deg);
+}
+.override-scope summary span {
+  overflow-wrap: anywhere;
+}
+.override-target-settings {
+  display: grid;
+  gap: 8px;
+  padding: 4px 0 10px;
+}
+.override-target-settings > button {
+  justify-self: start;
+}
+.override-conditions {
+  margin-top: 2px;
+}
+.override-conditions summary {
+  color: var(--info-foreground);
+  grid-column: 1 / -1;
+}
+@media (max-width: 700px) {
+  .call-search {
+    grid-template-columns: 1fr 1fr;
+  }
+  .call-search input {
+    grid-column: 1 / -1;
+  }
+  .call-browser,
+  .response-comparison,
+  .override-fields,
+  .override-conditions[open] {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+  .call-history {
+    max-height: 28dvh;
+    padding-right: 0;
+  }
+  .call-inspector {
+    padding: 16px 0 0;
+    margin-top: 12px;
+    border-left: 0;
+    border-top: 1px solid var(--border);
+  }
+  .call-inspector {
+    overflow: visible;
+  }
+  .call-inspector pre {
+    max-height: 24dvh;
+    overflow: auto;
+  }
+  .override-dialog[data-size="wide"] {
+    width: calc(100vw - 16px);
+  }
+  .override-scope {
+    flex-basis: 100%;
+  }
+  .response-direction {
+    display: none;
+  }
+  .response-pane .cm-editor {
+    height: clamp(8rem, 23dvh, 14rem);
+  }
+  .response-pane[data-side="after"] {
+    border-top: 1px solid var(--border);
+  }
+  .response-pane[data-side="after"] {
+    border-inline-start: 0;
+  }
+  .override-call-title {
+    flex-wrap: wrap;
+    gap: 2px 6px;
+  }
+
+  .override-dialog .quill-dialog__footer {
+    flex-wrap: wrap;
+  }
+  .override-dialog .quill-dialog__footer > span {
+    width: 100%;
+  }
+}
+
+.override-scope[data-needs-target="true"] > summary span {
+  color: var(--info-foreground);
+  text-decoration: underline;
+}
+
+.report-overrides {
+  min-width: 0;
+  border-top: 1px solid var(--border);
+  padding-block: 12px;
+}
+.report-overrides h2 {
+  margin: 0;
+}
+.report-overrides ol {
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.report-overrides p {
+  margin: 4px 0 0;
+}
+.report-overrides li + li {
+  border-top: 1px solid var(--border);
+}
+.report-overrides summary {
+  padding-block: 6px;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+.report-overrides summary small {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  margin-inline-start: 1rem;
+  color: var(--muted-foreground);
+}
+.report-overrides summary code {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 42ch;
+  font-size: 11px;
+}
+.report-overrides dl {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 4px 12px;
+  padding: 6px 0 10px 1rem;
+  margin: 0;
+}
+.report-overrides dd {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 12rem;
+  overflow: auto;
+}
+.report-overrides dt {
+  color: var(--muted-foreground);
+}

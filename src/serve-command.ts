@@ -59,6 +59,7 @@ export class ServeCommand extends CommandRunner {
         next();
       },
     );
+    app.useBodyParser("json", { limit: "3mb" });
     serveWebAssets(app);
 
     // Native harness processes cannot resume after an application restart.
@@ -75,7 +76,7 @@ export class ServeCommand extends CommandRunner {
     const url = await app.getUrl();
 
     console.log(
-      `Agent eval: ${url}\nData directory: ${resolveDataDirectory()}\nPress Ctrl+C to stop.`,
+      `StuntHog: ${url}\nData directory: ${resolveDataDirectory()}\nPress Ctrl+C to stop.`,
     );
 
     if (options.open !== false)
@@ -92,7 +93,7 @@ export class ServeCommand extends CommandRunner {
   @Option({
     flags: "--data <directory>",
     description:
-      "Directory for SQLite and the encryption key (default: ~/.agent-eval)",
+      "Directory for SQLite and the encryption key. New installations use ~/.stunthog.",
   })
   data(value: string): string {
     return value;

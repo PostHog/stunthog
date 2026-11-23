@@ -1,0 +1,1 @@
+ALTER TABLE "Eval" ADD COLUMN "responseOverrides" JSONB NOT NULL DEFAULT '[]';

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { ResponseCapture } from "../../../../src/overrides/domain/response-override.js";
 
 export type EntryKind =
   | "message"
@@ -10,6 +11,11 @@ export type EntryKind =
 export interface TranscriptEntry {
   id: string;
   sequence: number;
+  capture?: ResponseCapture | undefined;
+  responseId?: string | undefined;
+  args?: Record<string, unknown> | undefined;
+  name?: string | undefined;
+  server?: string | undefined;
   kind: EntryKind;
   title: string;
   text: string;

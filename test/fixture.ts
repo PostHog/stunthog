@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 export async function fixture() {
-  const root = await mkdtemp(join(tmpdir(), "agent-eval-test-"));
+  const root = await mkdtemp(join(tmpdir(), "stunthog-test-"));
 
   const workspace = join(root, "project");
 

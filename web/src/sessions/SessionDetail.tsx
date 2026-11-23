@@ -9,6 +9,7 @@ import { useState } from "react";
 import { api, useApi } from "../api.js";
 import { Notice, PageTitle, Status } from "../components.js";
 import { ModelReference } from "../models/ModelReference.js";
+import { ResponseOverrideList } from "../overrides/ResponseOverrideList.js";
 import { RequestState } from "../PageState.js";
 import { ResourceIcon } from "../resources/ResourceIcon.js";
 import { StatusIcon } from "../status/StatusIcon.js";
@@ -123,6 +124,10 @@ export function SessionDetail({ id }: { id: string }) {
         >
           <h2>Session details</h2>
           <SessionMetadata session={session} />
+          <ResponseOverrideList
+            rules={session.snapshot.evaluation.responseOverrides}
+            servers={session.snapshot.mcps}
+          />
           <SessionJudgment session={session} />
         </section>
       </div>

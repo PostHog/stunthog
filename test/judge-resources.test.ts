@@ -33,8 +33,8 @@ test(
 
 async function verifyJudgeResources() {
   const f = await fixture();
-  const data = await mkdtemp(join(tmpdir(), "agent-eval-judge-resources-"));
-  const previousDirectory = process.env.AGENT_EVAL_DATA_DIR;
+  const data = await mkdtemp(join(tmpdir(), "stunthog-judge-resources-"));
+  const previousDirectory = process.env.STUNTHOG_DATA_DIR;
   const previousUrl = process.env.DATABASE_URL;
 
   await migrateDatabase(data);
@@ -278,8 +278,8 @@ async function verifyJudgeResources() {
     await starter.onModuleDestroy();
   } finally {
     await db.$disconnect();
-    if (previousDirectory === undefined) delete process.env.AGENT_EVAL_DATA_DIR;
-    else process.env.AGENT_EVAL_DATA_DIR = previousDirectory;
+    if (previousDirectory === undefined) delete process.env.STUNTHOG_DATA_DIR;
+    else process.env.STUNTHOG_DATA_DIR = previousDirectory;
     if (previousUrl === undefined) delete process.env.DATABASE_URL;
     else process.env.DATABASE_URL = previousUrl;
     await rm(data, { recursive: true, force: true });

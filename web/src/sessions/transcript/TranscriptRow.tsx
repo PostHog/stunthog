@@ -1,8 +1,17 @@
 import {
+  Button,
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
 } from "@posthog/quill";
+import type { ReactNode } from "react";
+import type { ResponseCapture } from "../../../../src/overrides/domain/response-override.js";
+import { ResponseComparison } from "../../overrides/ResponseComparison.js";
+import { displayResponse } from "../../overrides/response-text.js";
 import { StatusIcon } from "../../status/StatusIcon.js";
 import { Markdown } from "../Markdown.js";
 import {
@@ -27,15 +36,24 @@ function Highlighted({
 export function TranscriptRow({
   entry,
   matches,
+  onOverride,
+  editing = false,
+  children,
 }: {
   entry: TranscriptEntry;
+  editing?: boolean;
+  children?: ReactNode;
+  onOverride?: (capture: ResponseCapture, selection: string) => void;
   matches?: TranscriptMatches | undefined;
 }) {
+  const capture = entry.capture;
+  const modified = capture?.ruleId ? capture : undefined;
   const tool = entry.kind === "tool" || entry.kind === "web";
 
   return (
     <article
       className={`transcript-row transcript-${entry.kind}`}
+      data-modified={modified ? true : undefined}
       id={`event-${entry.sequence}`}
     >
       <span className="transcript-sequence">{entry.sequence}</span>
@@ -66,8 +84,38 @@ export function TranscriptRow({
             <code>
               <Highlighted text={entry.text} ranges={matches?.text} />
             </code>
+            {capture && onOverride && (
+              <Button
+                type="button"
+                variant="outline"
+                className="trace-intercept-action"
+                id={`intercept-${entry.id}`}
+                aria-expanded={editing}
+                aria-label={`Intercept ${entry.title} response`}
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={(event) => {
+                  const selected = window.getSelection();
+                  const text =
+                    selected?.anchorNode &&
+                    event.currentTarget
+                      .closest("article")
+                      ?.contains(selected.anchorNode)
+                      ? selected.toString()
+                      : "";
+                  onOverride(capture, text);
+                }}
+              >
+                Intercept
+              </Button>
+            )}
           </div>
-          {entry.output ? (
+          {modified && (
+            <span className="modified-label">Response modified</span>
+          )}
+          {entry.capture?.error && (
+            <span className="error">{entry.capture.error}</span>
+          )}
+          {entry.output || entry.capture ? (
             <Collapsible
               className="tool-output"
               key={matches?.output ? "match" : "idle"}
@@ -77,12 +125,42 @@ export function TranscriptRow({
                 <span className={`tool-result-status ${entry.status}`}>
                   {entry.status === "failed" ? "Failed" : "Result"}
                 </span>{" "}
-                {entry.output.replaceAll(/\s+/g, " ").slice(0, 180)}
+                {(entry.output ?? "").replaceAll(/\s+/g, " ").slice(0, 180)}
               </CollapsibleTrigger>
               <CollapsibleContent>
-                <pre>
-                  <Highlighted text={entry.output} ranges={matches?.output} />
-                </pre>
+                {modified ? (
+                  <Tabs defaultValue="diff" className="trace-result-tabs">
+                    <TabsList aria-label="Tool response">
+                      <TabsTrigger value="diff">Response diff</TabsTrigger>
+                      <TabsTrigger value="original">Original</TabsTrigger>
+                      <TabsTrigger value="modified">Modified</TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="diff">
+                      <ResponseComparison
+                        before={displayResponse(modified.original)}
+                        after={entry.output ?? ""}
+                      />
+                    </TabsContent>
+                    <TabsContent value="original">
+                      <pre>{displayResponse(modified.original)}</pre>
+                    </TabsContent>
+                    <TabsContent value="modified">
+                      <pre>
+                        <Highlighted
+                          text={entry.output ?? ""}
+                          ranges={matches?.output}
+                        />
+                      </pre>
+                    </TabsContent>
+                  </Tabs>
+                ) : (
+                  <pre>
+                    <Highlighted
+                      text={entry.output ?? ""}
+                      ranges={matches?.output}
+                    />
+                  </pre>
+                )}
               </CollapsibleContent>
             </Collapsible>
           ) : (
@@ -94,6 +172,7 @@ export function TranscriptRow({
                   : "No output"}
             </span>
           )}
+          {children}
         </div>
       ) : entry.kind === "thinking" ? (
         <Collapsible

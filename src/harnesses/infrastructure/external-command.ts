@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { ProcessCommand } from "../domain/execution.js";
@@ -6,7 +7,11 @@ import type { HarnessInput } from "../domain/harness.js";
 export async function externalCommand(
   id: "codex" | "claude" | "opencode",
   input: HarnessInput,
+  shellHook?: string,
 ): Promise<ProcessCommand> {
+  const managedWeb = input.responseOverrides?.some(
+    (rule) => rule.target.kind === "web",
+  );
   const model = input.settings.model;
   const effort = input.settings.effort;
   const env = input.runtime?.kind === "docker" ? {} : { ...process.env };
@@ -23,7 +28,7 @@ export async function externalCommand(
   if (id !== "claude" && input.mcps?.some((server) => server.allowedTools))
     throw new Error(`The ${id} harness cannot limit MCP tools.`);
 
-  const tokenVariable = (index: number) => `AGENT_EVAL_MCP_TOKEN_${index}`;
+  const tokenVariable = (index: number) => `STUNTHOG_MCP_TOKEN_${index}`;
   for (const [index, server] of (input.mcps ?? []).entries()) {
     if (server.accessToken) env[tokenVariable(index)] = server.accessToken;
   }
@@ -34,6 +39,9 @@ export async function externalCommand(
 
     // With approval_policy="never", Codex rejects MCP calls unless each configured server pre-approves its tools.
     const mcpArgs = (input.mcps ?? []).flatMap((server, index) => [
+      ...(server.required
+        ? ["-c", `mcp_servers.eval_${index}.required=true`]
+        : []),
       ...(server.url
         ? ["-c", `mcp_servers.eval_${index}.url=${JSON.stringify(server.url)}`]
         : [
@@ -42,7 +50,13 @@ export async function externalCommand(
             "-c",
             `mcp_servers.eval_${index}.args=${JSON.stringify(server.arguments)}`,
           ]),
-      ...(server.accessToken
+      ...(server.accessToken && !server.url
+        ? [
+            "-c",
+            `mcp_servers.eval_${index}.env_vars=[${JSON.stringify(tokenVariable(index))}]`,
+          ]
+        : []),
+      ...(server.accessToken && server.url
         ? [
             "-c",
             `mcp_servers.eval_${index}.bearer_token_env_var=${JSON.stringify(tokenVariable(index))}`,
@@ -77,6 +91,12 @@ export async function externalCommand(
         "--model",
         model,
         ...mcpArgs,
+        ...(shellHook
+          ? codexShellHook(
+              shellHook,
+              input.runtime?.kind !== "docker" && process.platform === "win32",
+            )
+          : []),
         "-",
       ],
       env,
@@ -85,6 +105,11 @@ export async function externalCommand(
 
   if (id === "claude") {
     env.ANTHROPIC_API_KEY = input.apiKey;
+    // Bare mode skips every hook. Load only our settings and keep this run's Claude state isolated.
+    if (shellHook) {
+      const state = join(input.directory, "claude-state");
+      env.CLAUDE_CONFIG_DIR = input.runtime?.filePath?.(state) ?? state;
+    }
 
     const path = join(input.directory, "mcp-config.json");
 
@@ -104,7 +129,15 @@ export async function externalCommand(
                     },
                   }),
                 }
-              : { command: server.command, args: server.arguments },
+              : {
+                  command: server.command,
+                  args: server.arguments,
+                  ...(server.accessToken && {
+                    env: {
+                      [tokenVariable(index)]: `\${${tokenVariable(index)}}`,
+                    },
+                  }),
+                },
           ]),
         ),
       }),
@@ -114,7 +147,29 @@ export async function externalCommand(
       binary: "claude",
       args: [
         "--print",
-        "--bare",
+        ...(shellHook
+          ? [
+              "--setting-sources",
+              "",
+              "--settings",
+              JSON.stringify({
+                hooks: {
+                  PostToolUse: [
+                    {
+                      matcher: "^Bash$",
+                      hooks: [
+                        {
+                          type: "command",
+                          command: shellHook,
+                          timeout: 10,
+                        },
+                      ],
+                    },
+                  ],
+                },
+              }),
+            ]
+          : ["--bare"]),
         "--verbose",
         "--output-format",
         "stream-json",
@@ -132,7 +187,7 @@ export async function externalCommand(
           "Write",
           "Glob",
           "Grep",
-          "WebFetch",
+          ...(managedWeb ? [] : ["WebFetch"]),
           "WebSearch",
           ...(input.mcps ?? []).flatMap((server, index) =>
             server.allowedTools
@@ -143,6 +198,7 @@ export async function externalCommand(
           ),
         ].join(","),
         ...(input.tools.length ? [] : ["--tools", ""]),
+        ...(managedWeb ? ["--disallowedTools", "WebFetch"] : []),
         "--strict-mcp-config",
         "--mcp-config",
         path,
@@ -153,6 +209,9 @@ export async function externalCommand(
 
   env.OPENROUTER_API_KEY = input.apiKey;
   env.OPENCODE_CONFIG_CONTENT = JSON.stringify({
+    ...(shellHook && {
+      [input.runtime?.kind === "docker" ? "plugin" : "plugins"]: [shellHook],
+    }),
     provider: { openrouter: { options: { apiKey: input.apiKey } } },
     mcp: Object.fromEntries(
       (input.mcps ?? []).map((server, index) => [
@@ -168,10 +227,22 @@ export async function externalCommand(
                 },
               }),
             }
-          : { type: "local", command: [server.command, ...server.arguments] },
+          : {
+              type: "local",
+              command: [server.command, ...server.arguments],
+              ...(server.accessToken && {
+                environment: {
+                  [tokenVariable(index)]: `{env:${tokenVariable(index)}}`,
+                },
+              }),
+            },
       ]),
     ),
-    permission: input.tools.length ? "allow" : "deny",
+    permission: input.tools.length
+      ? managedWeb
+        ? { "*": "allow", webfetch: "deny" }
+        : "allow"
+      : "deny",
   });
 
   // Docker installs the published v1 CLI; local runs use v2's private server.
@@ -190,6 +261,29 @@ export async function externalCommand(
     ],
     env,
   };
+}
+
+function codexShellHook(command: string, windows: boolean) {
+  const matcher = "^Bash$";
+  // Codex fingerprints the normalized declaration. Trust only this session's generated command.
+  const identity = {
+    event_name: "post_tool_use",
+    hooks: [{ async: false, command, timeout: 10, type: "command" }],
+    matcher,
+  };
+  const hash = createHash("sha256")
+    .update(JSON.stringify(identity))
+    .digest("hex");
+  const source = windows
+    ? "C:\\<session-flags>\\config.toml"
+    : "/<session-flags>/config.toml";
+  const key = JSON.stringify(`${source}:post_tool_use:0:0`);
+  return [
+    "-c",
+    `hooks.PostToolUse=[{matcher="${matcher}",hooks=[{type="command",command=${JSON.stringify(command)},timeout=10}]}]`,
+    "-c",
+    `hooks.state={${key}={trusted_hash="sha256:${hash}"}}`,
+  ];
 }
 
 // Claude Code replaces characters outside letters, digits, underscores, and hyphens in MCP tool names.

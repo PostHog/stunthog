@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
+import { rulesSchema } from "../../overrides/domain/response-override.js";
 import { Criterion } from "./criterion.js";
 import { ModelSettings, type ModelSettingsData } from "./model-settings.js";
 
@@ -16,6 +17,7 @@ const schema = z
       .min(1),
     environmentId: z.string().uuid().nullable(),
     personaId: z.string().uuid().nullable(),
+    responseOverrides: rulesSchema.optional(),
     skillIds: z.array(z.string().uuid()),
     mcpIds: z.array(z.string().uuid()),
     // Judge resources are separate from agent resources. Older records have none.
@@ -55,6 +57,15 @@ export class Evaluation {
     );
 
     if (
+      data.responseOverrides?.some(
+        (rule) =>
+          rule.target.kind === "mcp" &&
+          !data.mcpIds.includes(rule.target.serverId),
+      )
+    )
+      throw new Error("Select the MCP server for each response override.");
+
+    if (
       new Set(criteria.map((criterion) => criterion.id)).size !==
       criteria.length
     )
@@ -87,6 +98,10 @@ export class Evaluation {
 
     return Evaluation.create({
       ...data,
+      responseOverrides: data.responseOverrides?.map((rule) => ({
+        ...rule,
+        id: randomUUID(),
+      })),
       criteria: data.criteria.map((criterion) =>
         Criterion.create(criterion.description),
       ),

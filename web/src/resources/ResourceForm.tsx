@@ -332,10 +332,9 @@ export function ResourceForm({
                     />
                   )}
                   <p className="muted">
-                    agent-eval installs the selected native harness with npm.
-                    For a native harness, the final image must include Node.js
-                    22, npm, and sh. Pi requires only the commands the agent
-                    uses.
+                    StuntHog installs the selected native harness with npm. For
+                    a native harness, the final image must include Node.js 22,
+                    npm, and sh. Pi requires only the commands the agent uses.
                   </p>
                 </div>
               </TabsContent>

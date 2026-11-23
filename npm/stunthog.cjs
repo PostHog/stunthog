@@ -3,20 +3,20 @@ const { spawn, spawnSync } = require("node:child_process");
 const { join, resolve } = require("node:path");
 
 const registry = "https://registry.npmjs.org";
-const packageName = "@posthog/agent-eval";
+const packageName = "@posthog/stunthog";
 
 const binaries = {
-  "darwin-arm64": "agent-eval-darwin-arm64",
-  "darwin-x64": "agent-eval-darwin-x64",
-  "linux-arm64": "agent-eval-linux-arm64",
-  "linux-x64": "agent-eval-linux-x64",
-  "win32-x64": "agent-eval-windows-x64.exe",
+  "darwin-arm64": "stunthog-darwin-arm64",
+  "darwin-x64": "stunthog-darwin-x64",
+  "linux-arm64": "stunthog-linux-arm64",
+  "linux-x64": "stunthog-linux-x64",
+  "win32-x64": "stunthog-windows-x64.exe",
 };
 
 function binaryName(platform, architecture) {
   const name = binaries[`${platform}-${architecture}`];
   if (!name) {
-    throw new Error(`agent-eval does not support ${platform}/${architecture}.`);
+    throw new Error(`StuntHog does not support ${platform}/${architecture}.`);
   }
   return name;
 }
@@ -38,7 +38,7 @@ function isNewerVersion(latest, installed) {
 async function checkForUpdate(autoUpdate) {
   let latest;
   try {
-    const response = await fetch(`${registry}/@posthog%2fagent-eval/latest`, {
+    const response = await fetch(`${registry}/@posthog%2fstunthog/latest`, {
       signal: AbortSignal.timeout(2000),
     });
     if (!response.ok) return;
@@ -53,7 +53,7 @@ async function checkForUpdate(autoUpdate) {
   const command = `npm install -g ${packageName}@${latest}`;
   if (!autoUpdate) {
     console.error(
-      `agent-eval ${latest} is available (installed ${version}). Update with ${command} or run agent-eval --auto-update.`,
+      `StuntHog ${latest} is available (installed ${version}). Update with ${command} or run stunthog --auto-update.`,
     );
     return;
   }
@@ -70,7 +70,7 @@ async function checkForUpdate(autoUpdate) {
     return;
   }
 
-  console.error(`Updating agent-eval from ${version} to ${latest}…`);
+  console.error(`Updating StuntHog from ${version} to ${latest}…`);
   // Keep the prefix out of the Windows command shell and update before the executable is in use.
   const result = spawnSync(
     "npm",
@@ -94,7 +94,7 @@ async function checkForUpdate(autoUpdate) {
     },
   );
   if (result.status !== 0) {
-    console.error(`Could not update agent-eval. Try ${command}.`);
+    console.error(`Could not update StuntHog. Try ${command}.`);
   }
 }
 
@@ -110,7 +110,9 @@ async function main() {
   if (autoUpdate) args.shift();
   if (!args.some((arg) => ["--help", "-h", "--version", "-V"].includes(arg))) {
     await checkForUpdate(
-      autoUpdate || process.env.AGENT_EVAL_AUTO_UPDATE === "1",
+      autoUpdate ||
+        (process.env.STUNTHOG_AUTO_UPDATE ??
+          process.env.AGENT_EVAL_AUTO_UPDATE) === "1",
     );
   }
   const child = spawn(executable, args, { stdio: "inherit" });
@@ -122,7 +124,7 @@ async function main() {
     return [signal, handler];
   });
   child.once("error", (error) => {
-    console.error(`Could not start agent-eval: ${error.message}`);
+    console.error(`Could not start StuntHog: ${error.message}`);
     if (error.code === "ENOENT") {
       console.error(
         `Reinstall with npm install -g ${packageName} --ignore-scripts=false to download the executable.`,

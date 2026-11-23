@@ -66,9 +66,9 @@ class DockerWorkspaceRuntime implements HarnessRuntime {
           "--detach",
           "--rm",
           "--mount",
-          `type=bind,source=${root},target=/agent-eval`,
+          `type=bind,source=${root},target=/stunthog`,
           "--workdir",
-          "/agent-eval/workspace",
+          "/stunthog/workspace",
           image,
           "sh",
           "-c",
@@ -92,7 +92,7 @@ class DockerWorkspaceRuntime implements HarnessRuntime {
         "exec",
         "--interactive",
         "--workdir",
-        this.containerPath(cwd),
+        this.filePath(cwd),
         ...environmentArgs,
         this.container,
         this.map(command.binary),
@@ -110,7 +110,7 @@ class DockerWorkspaceRuntime implements HarnessRuntime {
         "exec",
         "--interactive",
         "--workdir",
-        this.containerPath(cwd),
+        this.filePath(cwd),
         ...environmentArgs,
         this.container,
         "sh",
@@ -125,7 +125,7 @@ class DockerWorkspaceRuntime implements HarnessRuntime {
     await control(["rm", "--force", this.container]).catch(() => undefined);
   }
 
-  private containerPath(path: string): string {
+  filePath(path: string): string {
     const absolute = resolve(path);
 
     if (!contains(this.root, absolute))
@@ -133,11 +133,11 @@ class DockerWorkspaceRuntime implements HarnessRuntime {
 
     const suffix = relative(this.root, absolute).split(sep).filter(Boolean);
 
-    return ["/agent-eval", ...suffix].join("/");
+    return ["/stunthog", ...suffix].join("/");
   }
 
   private map(value: string): string {
-    return value.replaceAll(this.root, "/agent-eval");
+    return value.replaceAll(this.root, "/stunthog");
   }
 
   private async environmentArguments(

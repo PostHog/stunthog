@@ -88,7 +88,15 @@
   font-variant-numeric: tabular-nums;
 }
 .session-metadata dt {
+  display: flex;
+  align-items: center;
+  gap: 5px;
   font-size: 11px;
+}
+.session-metadata dt svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
 }
 .eval-outcome {
   font-weight: 400;

@@ -49,7 +49,7 @@ jobs:
         if: runner.os != 'Windows'
         shell: bash
         run: |
-          release/agent-eval --no-open --port 3199 --data "$RUNNER_TEMP/agent-eval-smoke" &
+          release/stunthog --no-open --port 3199 --data "$RUNNER_TEMP/stunthog-smoke" &
           pid=$!
           trap 'kill "$pid"' EXIT
           for attempt in {1..30}; do
@@ -61,9 +61,9 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $stdout = "$env:RUNNER_TEMP/agent-eval.stdout.log"
-          $stderr = "$env:RUNNER_TEMP/agent-eval.stderr.log"
-          $process = Start-Process -NoNewWindow -RedirectStandardOutput $stdout -RedirectStandardError $stderr -FilePath release/agent-eval.exe -ArgumentList "--no-open", "--port", "3199", "--data", "$env:RUNNER_TEMP/agent-eval-smoke" -PassThru
+          $stdout = "$env:RUNNER_TEMP/stunthog.stdout.log"
+          $stderr = "$env:RUNNER_TEMP/stunthog.stderr.log"
+          $process = Start-Process -NoNewWindow -RedirectStandardOutput $stdout -RedirectStandardError $stderr -FilePath release/stunthog.exe -ArgumentList "--no-open", "--port", "3199", "--data", "$env:RUNNER_TEMP/stunthog-smoke" -PassThru
           try {
             foreach ($attempt in 1..30) {
               if ($process.HasExited) { exit 1 }
@@ -84,20 +84,20 @@ jobs:
         if: runner.os != 'Windows'
         shell: bash
         run: |
-          mv release/agent-eval release/agent-eval-${{ matrix.target }}
-          tar -C release -czf release/agent-eval-${{ matrix.target }}.tar.gz agent-eval-${{ matrix.target }}
-          shasum -a 256 release/agent-eval-${{ matrix.target }}.tar.gz > release/agent-eval-${{ matrix.target }}.tar.gz.sha256
+          mv release/stunthog release/stunthog-${{ matrix.target }}
+          tar -C release -czf release/stunthog-${{ matrix.target }}.tar.gz stunthog-${{ matrix.target }}
+          shasum -a 256 release/stunthog-${{ matrix.target }}.tar.gz > release/stunthog-${{ matrix.target }}.tar.gz.sha256
       - name: Package executable
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          Move-Item release/agent-eval.exe release/agent-eval-${{ matrix.target }}.exe
-          Compress-Archive release/agent-eval-${{ matrix.target }}.exe release/agent-eval-${{ matrix.target }}.zip
-          $hash = (Get-FileHash release/agent-eval-${{ matrix.target }}.zip -Algorithm SHA256).Hash.ToLower()
-          "$hash  agent-eval-${{ matrix.target }}.zip" | Set-Content release/agent-eval-${{ matrix.target }}.zip.sha256
+          Move-Item release/stunthog.exe release/stunthog-${{ matrix.target }}.exe
+          Compress-Archive release/stunthog-${{ matrix.target }}.exe release/stunthog-${{ matrix.target }}.zip
+          $hash = (Get-FileHash release/stunthog-${{ matrix.target }}.zip -Algorithm SHA256).Hash.ToLower()
+          "$hash  stunthog-${{ matrix.target }}.zip" | Set-Content release/stunthog-${{ matrix.target }}.zip.sha256
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: agent-eval-${{ matrix.target }}
+          name: stunthog-${{ matrix.target }}
           path: |
             release/*.tar.gz
             release/*.zip
@@ -112,7 +112,7 @@ jobs:
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           path: artifacts
-          pattern: agent-eval-*
+          pattern: stunthog-*
           merge-multiple: true
       - name: Create release and upload executables
         env:
@@ -139,7 +139,7 @@ jobs:
           node-version: "24"
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
-          pattern: agent-eval-*
+          pattern: stunthog-*
           path: release
           merge-multiple: true
       - name: Pack launcher and release checksums
@@ -181,12 +181,12 @@ jobs:
             echo "$RUNNER_TEMP/npm-prefix/bin" >> "$GITHUB_PATH"
           fi
       - name: Run installed command from PATH
-        run: agent-eval --help
+        run: stunthog --help
       - name: Start installed application without source dependencies
         shell: bash
         run: |
           cd "$RUNNER_TEMP"
-          agent-eval --no-open --port 3199 --data "$RUNNER_TEMP/agent-eval-installed-smoke" &
+          stunthog --no-open --port 3199 --data "$RUNNER_TEMP/stunthog-installed-smoke" &
           pid=$!
           trap 'kill "$pid" 2>/dev/null || true' EXIT
           for attempt in {1..30}; do
@@ -198,9 +198,9 @@ jobs:
       - name: Verify uninstall removes the PATH command
         shell: bash
         run: |
-          npm uninstall --global --prefix "$RUNNER_TEMP/npm-prefix" @posthog/agent-eval
+          npm uninstall --global --prefix "$RUNNER_TEMP/npm-prefix" @posthog/stunthog
           hash -r
-          if command -v agent-eval; then exit 1; fi
+          if command -v stunthog; then exit 1; fi
 
   publish-npm:
     name: Publish to npm with OIDC
