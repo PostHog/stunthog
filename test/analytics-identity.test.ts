@@ -68,6 +68,7 @@ test(
 
 test("backend events, exceptions, logs, and agent/judge traces share the anonymous installation identity", async () => {
   const bodies: Record<string, unknown>[] = [];
+  const bodyPaths: (string | undefined)[] = [];
   const server = createServer(async (request, response) => {
     const chunks: Buffer[] = [];
     for await (const chunk of request) chunks.push(Buffer.from(chunk));
@@ -77,6 +78,7 @@ test("backend events, exceptions, logs, and agent/judge traces share the anonymo
         ? gunzipSync(buffer)
         : buffer;
     bodies.push(JSON.parse(json.toString()));
+    bodyPaths.push(request.url);
     response.writeHead(200, { "Content-Type": "application/json" });
     response.end("{}");
   });
@@ -128,11 +130,15 @@ test("backend events, exceptions, logs, and agent/judge traces share the anonymo
     );
     await analytics.onApplicationShutdown();
 
-    const events = bodies.flatMap((body) =>
-      Array.isArray(body.batch) ? body.batch : [],
+    const events = bodies.flatMap((body, index) =>
+      Array.isArray(body.batch)
+        ? body.batch.map((event) => ({ ...event, path: bodyPaths[index] }))
+        : [],
     ) as {
       event: string;
       distinct_id: string;
+      options?: Record<string, unknown>;
+      path?: string;
       properties: Record<string, unknown>;
     }[];
     for (const event of [
@@ -151,6 +157,13 @@ test("backend events, exceptions, logs, and agent/judge traces share the anonymo
       assert.equal(event.distinct_id, distinctId);
       assert.equal(event.properties.$is_identified, false);
       assert.equal(event.properties.$device_id, distinctId);
+      assert.equal(event.options?.process_person_profile, true);
+      assert.equal(
+        event.path,
+        event.event.startsWith("$ai_")
+          ? "/i/v1/ai/events"
+          : "/i/v1/analytics/events",
+      );
     }
     const ai = events.filter((event) => event.event.startsWith("$ai_"));
     assert.equal(ai.length, 5);

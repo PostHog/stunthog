@@ -51,7 +51,7 @@
     "open": "10.2.0",
     "p-limit": "6.2.0",
     "posthog-js": "^1.447.15",
-    "posthog-node": "^5.74.0",
+    "posthog-node": "^6.0.5",
     "re2js": "2.10.0",
     "react": "19.3.1",
     "react-dom": "19.3.1",

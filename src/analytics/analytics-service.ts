@@ -22,15 +22,15 @@ export class AnalyticsService implements OnApplicationShutdown {
         ? new PostHog(token, {
             host,
             enableExceptionAutocapture: true,
-            before_send: (event) => ({
+            beforeSend: (event) => ({
               ...event,
               distinctId,
               properties: {
                 ...event.properties,
                 $device_id: distinctId,
                 $is_identified: false,
-                $process_person_profile: true,
               },
+              options: { ...event.options, process_person_profile: true },
             }),
             logs: {
               serviceName: "stunthog-backend",
@@ -71,7 +71,7 @@ export class AnalyticsService implements OnApplicationShutdown {
 
   captureAi: CaptureAi = (event, properties, timestamp) => {
     try {
-      this.client?.capture({
+      this.client?.captureAi({
         distinctId: this.distinctId,
         event,
         properties,
@@ -83,7 +83,10 @@ export class AnalyticsService implements OnApplicationShutdown {
   };
 
   exception(error: unknown, operation: string): void {
-    this.client?.captureException(error, this.distinctId, { operation });
+    this.client?.captureException(error, {
+      distinctId: this.distinctId,
+      properties: { operation },
+    });
     this.client?.logger.error("Operation failed", { operation });
   }
 
