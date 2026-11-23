@@ -8,6 +8,7 @@ import {
   Query,
   StreamableFile,
 } from "@nestjs/common";
+import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { Database } from "../infrastructure/database.js";
 import { StartSessions } from "../sessions/application/start-sessions.js";
@@ -20,13 +21,30 @@ export class SessionsController {
   ) {}
 
   @Get()
-  list(@Query("evalId") evalId?: string) {
-    return this.db.session.findMany({
+  async list(@Query("evalId") evalId?: string) {
+    const sessions = await this.db.session.findMany({
       where: evalId ? { evalId: z.string().uuid().parse(evalId) } : {},
       orderBy: { createdAt: "desc" },
       take: 500,
       include: { eval: { select: { title: true } }, decisions: true },
     });
+    const counts = await this.interceptedCalls(
+      sessions.map((session) => session.id),
+    );
+    return sessions.map((session) => ({
+      ...session,
+      interceptedCalls: counts.get(session.id) ?? 0,
+    }));
+  }
+
+  private async interceptedCalls(ids: string[]) {
+    if (!ids.length) return new Map<string, number>();
+    const counts = await this.db.$queryRaw<
+      { sessionId: string; total: bigint }[]
+    >`SELECT sessionId, COUNT(DISTINCT json_extract(event, '$.callId')) AS total
+      FROM SessionEvent WHERE phase = 'response' AND json_type(event, '$.ruleId') = 'text'
+      AND sessionId IN (${Prisma.join(ids)}) GROUP BY sessionId`;
+    return new Map(counts.map((row) => [row.sessionId, Number(row.total)]));
   }
 
   @Get(":id")
@@ -38,7 +56,8 @@ export class SessionsController {
 
     if (!session) throw new NotFoundException("Session not found.");
 
-    return session;
+    const counts = await this.interceptedCalls([id]);
+    return { ...session, interceptedCalls: counts.get(id) ?? 0 };
   }
 
   @Get(":id/events")

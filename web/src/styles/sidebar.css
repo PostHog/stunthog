@@ -15,14 +15,22 @@
   padding: 0 2px 24px;
 }
 .brand {
-  display: block;
-  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: fit-content;
+  border-radius: 6px;
+  color: var(--foreground);
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1;
+  text-decoration: none;
 }
 .brand img {
   display: block;
-  width: 100%;
-  max-width: 204px;
-  height: auto;
+  flex: none;
+  width: 60px;
+  height: 60px;
 }
 .sidebar-create {
   width: 100%;
@@ -157,6 +165,14 @@
     align-items: center;
     justify-content: space-between;
     padding-bottom: 18px;
+  }
+  .brand {
+    gap: 6px;
+    font-size: 23px;
+  }
+  .brand img {
+    width: 42px;
+    height: 42px;
   }
   .sidebar-navigation {
     gap: 14px;

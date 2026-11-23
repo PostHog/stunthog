@@ -1,5 +1,5 @@
 import { Button } from "@posthog/quill";
-import brandLogo from "../../images/agent-eval-logo-brand.png";
+import stuntHedgehog from "../../images/posthog-hedgehog-evel.png";
 import { useApi } from "./api.js";
 
 type ProviderCredit = {
@@ -50,7 +50,8 @@ export function Sidebar({ page }: { page?: string }) {
     <aside className="sidebar">
       <div className="sidebar-header">
         <a className="brand" href="#evals">
-          <img src={brandLogo} alt="agent-eval" width="800" height="300" />
+          <img src={stuntHedgehog} alt="" width="60" height="60" />
+          <span>StuntHog</span>
         </a>
         <Button
           variant="primary"

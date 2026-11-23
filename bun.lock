@@ -3,8 +3,9 @@
   "configVersion": 0,
   "workspaces": {
     "": {
-      "name": "agent-eval",
+      "name": "stunthog",
       "dependencies": {
+        "@aliou/sh": "0.4.1",
         "@codemirror/language": "^6.13.1",
         "@codemirror/legacy-modes": "^6.5.5",
         "@earendil-works/pi-coding-agent": "1.1.0",
@@ -12,11 +13,13 @@
         "@nestjs/common": "11.2.9",
         "@nestjs/core": "11.2.9",
         "@nestjs/platform-express": "11.2.9",
+        "@posthog/icons": "0.40.0",
         "@posthog/quill": "0.3.0-beta.33",
         "@posthog/react": "^1.11.3",
         "@prisma/client": "6.19.3",
         "@uiw/react-codemirror": "^4.25.12",
         "chalk": "6.0.0",
+        "diff": "8.0.4",
         "dompurify": "3.4.17",
         "dotenv": "17.4.2",
         "fuse.js": "^7.5.0",
@@ -26,6 +29,7 @@
         "p-limit": "6.2.0",
         "posthog-js": "^1.447.15",
         "posthog-node": "^5.74.0",
+        "re2js": "2.10.0",
         "react": "19.3.1",
         "react-dom": "19.3.1",
         "reflect-metadata": "0.2.2",
@@ -63,6 +67,8 @@
     "ws": "8.22.0",
   },
   "packages": {
+    "@aliou/sh": ["@aliou/sh@0.4.1", "", {}, "sha512-2Yjm6sHF8bf8EOjXo5XkFHOMArl8F0ErLvr2kMnZ+xoUqqbIaT2T8m4lhTnMK5jXoKar3gAO1aGnoL5ioy0DBA=="],
+
     "@anthropic-ai/sdk": ["@anthropic-ai/sdk@0.129.0", "", { "dependencies": { "json-schema-to-ts": "^3.1.1", "standardwebhooks": "^1.0.0" }, "peerDependencies": { "zod": "^3.25.0 || ^4.0.0" }, "optionalPeers": ["zod"], "bin": { "anthropic-ai-sdk": "bin/cli" } }, "sha512-MH7LB20kNpGLUpPTe2OG5XvL/KhX8HUO9XyBaFjgFk6TLS4Xjt0VPIuMKywe7POKKPslX+QxSlVok9e+8kG5Nw=="],
 
     "@asamuzakjp/css-color": ["@asamuzakjp/css-color@5.1.11", "", { "dependencies": { "@asamuzakjp/generational-cache": "^1.0.1", "@csstools/css-calc": "^3.2.0", "@csstools/css-color-parser": "^4.1.0", "@csstools/css-parser-algorithms": "^4.0.0", "@csstools/css-tokenizer": "^4.0.0" } }, "sha512-KVw6qIiCTUQhByfTd78h2yD1/00waTmm9uy/R7Ck/ctUyAPj+AEDLkQIdJW0T8+qGgj3j5bpNKK7Q3G+LedJWg=="],
@@ -328,6 +334,8 @@
     "@posthog/browser-common": ["@posthog/browser-common@0.10.8", "", { "dependencies": { "@posthog/core": "^1.67.1", "@posthog/types": "^1.423.0", "dompurify": "^3.4.13", "preact": "^10.29.3" } }, "sha512-TQmqLVNFoKaL4dDV5Q8AScX2dIwdq8By2cj2KU1hMGe88tn7Usbf3U/hv5okhobEojntqJeslPIRBrG79Su+vg=="],
 
     "@posthog/core": ["@posthog/core@1.67.2", "", { "dependencies": { "@posthog/types": "^1.424.1" } }, "sha512-FcDdAm3L2UKxA2NWCxwG8KKgZ4QjGBl7f9WASLlCVPeKgXI0FeguSq81x0f2htEB37itKbUwLkNFgA3FV4b7iQ=="],
+
+    "@posthog/icons": ["@posthog/icons@0.40.0", "", { "peerDependencies": { "react": ">=16.14.0", "react-dom": ">=16.14.0" } }, "sha512-2JQD8RDdd5lKhf/jM5DB6qj2UxH7rGGqrDzSQcyDEjf3rnK5ei30u2HkA9TMCu1uEfNqSXDuAJLmoaTEBa7qIA=="],
 
     "@posthog/quill": ["@posthog/quill@0.3.0-beta.33", "", { "dependencies": { "class-variance-authority": "^0.7.1", "clsx": "^2.1.1", "lucide-react": "^0.577.0", "react-resizable-panels": "^4.7.1", "tailwind-merge": "^2.2.2" }, "peerDependencies": { "@base-ui/react": "^1.9.0", "react": "^18.3.1 || ^19.0.0", "react-dom": "^18.3.1 || ^19.0.0", "tailwindcss": "^4.0.0" } }, "sha512-AAo1nR3i9JMSVyflSg4RVingZbUbneqYuKd4o/Bqry9SrJwzTcAp4eIliTuCVypDRWl9m2NBAiB3qooleg6Ocw=="],
 
@@ -1050,6 +1058,8 @@
     "raw-body": ["raw-body@3.0.2", "", { "dependencies": { "bytes": "~3.1.2", "http-errors": "~2.0.1", "iconv-lite": "~0.7.0", "unpipe": "~1.0.0" } }, "sha512-K5zQjDllxWkf7Z5xJdV0/B0WTNqx6vxG70zJE4N0kBs4LovmEYWJzQGxC9bS9RAKu3bgM40lrd5zoLJ12MQ5BA=="],
 
     "rc9": ["rc9@2.1.2", "", { "dependencies": { "defu": "^6.1.4", "destr": "^2.0.3" } }, "sha512-btXCnMmRIBINM2LDZoEmOogIZU7Qe7zn4BpomSKZ/ykbLObuBdvG+mFq11DL6fjH1DRwHhrlgtYWG96bJiC7Cg=="],
+
+    "re2js": ["re2js@2.10.0", "", {}, "sha512-/P6FNnLbHjXJMRF1dPoZoVTyHvFcuVhbDpzml9DPMlbeErYlZ18GueAaG9GhYhAm/9AN7i7Y6crmDrLX0DeJ4Q=="],
 
     "react": ["react@19.3.1", "", {}, "sha512-QNhWdt7nrgVWWQG58QuGsAR3jv3Hbe4mb4vz7w2csnHavciZJgda1CPNaldF6eVxv90ud3jUXpKlHL69gO38yw=="],
 

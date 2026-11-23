@@ -1,3 +1,4 @@
+import { isDeepStrictEqual } from "node:util";
 import {
   BadRequestException,
   ConflictException,
@@ -8,6 +9,10 @@ import {
 } from "@nestjs/common";
 import { z } from "zod";
 import { AnalyticsService } from "../../analytics/analytics-service.js";
+import {
+  type ResponseRule,
+  rulesSchema,
+} from "../../overrides/domain/response-override.js";
 import { Criterion } from "../domain/criterion.js";
 import { Evaluation, mcpToolName } from "../domain/evaluation.js";
 import { EvaluationRepository } from "../domain/evaluation-repository.js";
@@ -23,6 +28,7 @@ const inputSchema = z
     ),
     environmentId: z.string().uuid().nullable().default(null),
     personaId: z.string().uuid().nullable().default(null),
+    responseOverrides: rulesSchema.optional(),
     skillIds: z.array(z.string().uuid()).default([]),
     mcpIds: z.array(z.string().uuid()).default([]),
     judgeSkillIds: z.array(z.string().uuid()).default([]),
@@ -70,6 +76,7 @@ export class EvaluationsService {
       );
 
     const data = {
+      responseOverrides: value.responseOverrides,
       title: value.title,
       prompt: value.prompt,
       environmentId: value.environmentId,
@@ -97,6 +104,7 @@ export class EvaluationsService {
           "This evaluation changed. Reload it before saving.",
         );
 
+      data.responseOverrides ??= entity.snapshot().responseOverrides;
       entity.revise(data);
     }
 
@@ -110,6 +118,24 @@ export class EvaluationsService {
     });
 
     return entity.snapshot();
+  }
+
+  async addOverride(id: string, rule: ResponseRule) {
+    const evaluation = await this.get(id);
+    const data = evaluation.snapshot();
+    if (data.responseOverrides?.some((saved) => isDeepStrictEqual(saved, rule)))
+      return data;
+    const { id: _id, revision: _revision, ...fields } = data;
+    evaluation.revise({
+      ...fields,
+      responseOverrides: [...(data.responseOverrides ?? []), rule],
+    });
+    await this.repository.save(evaluation);
+    this.analytics?.capture("response override added", {
+      evaluation_id: id,
+      source: rule.target.kind,
+    });
+    return evaluation.snapshot();
   }
 
   async duplicate(id: string) {

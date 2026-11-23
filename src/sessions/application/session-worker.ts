@@ -13,6 +13,7 @@ import type {
 } from "../../harnesses/domain/harness.js";
 import { HarnessRegistry } from "../../harnesses/domain/harness-registry.js";
 import { redactEvent } from "../../harnesses/domain/redact-secrets.js";
+import type { ResponseCapture } from "../../overrides/domain/response-override.js";
 import type { ExecutionSnapshot } from "../domain/execution-snapshot.js";
 import { judgingPrompt } from "../domain/judging-prompt.js";
 import type { Session } from "../domain/session.js";
@@ -45,7 +46,7 @@ export class SessionWorker {
   ): Promise<void> {
     const started = new Date();
     // Restore inputs, execute one harness, judge only its evidence, then persist the final state.
-    const root = await mkdtemp(join(tmpdir(), "agent-eval-session-"));
+    const root = await mkdtemp(join(tmpdir(), "stunthog-session-"));
     let agent: HarnessResult | undefined;
     let judge: HarnessResult | undefined;
     let agentRuntime:
@@ -326,6 +327,15 @@ export class SessionWorker {
       // The judge never gets built-in tools. It gets only the MCP servers selected for the judge.
       // Judge MCP tools are auto-approved, so the judge sees only the tools the author allowed.
       mcps,
+      ...(phase === "agent" && {
+        responseOverrides: snapshot.evaluation.responseOverrides ?? [],
+        onToolResponse: (capture: ResponseCapture) =>
+          this.sessions.event(
+            session.id,
+            "response",
+            redactEvent(capture, secrets),
+          ),
+      }),
       onRawEvent: (event) =>
         this.sessions.event(session.id, phase, redactEvent(event, secrets)),
     };

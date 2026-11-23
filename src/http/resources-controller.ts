@@ -73,7 +73,7 @@ export class ResourcesController {
       await this.oauth.complete(state, code);
       response
         .type("text")
-        .send("MCP server connected. Close this tab to return to agent-eval.");
+        .send("MCP server connected. Close this tab to return to StuntHog.");
     } catch {
       response
         .status(400)

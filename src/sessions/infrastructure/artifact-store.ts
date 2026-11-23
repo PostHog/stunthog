@@ -36,7 +36,7 @@ export class ArtifactStore extends WorkspaceStore {
     sessionIds: string[],
     snapshot: ExecutionSnapshot,
   ): Promise<void> {
-    const root = await mkdtemp(join(tmpdir(), "agent-eval-input-"));
+    const root = await mkdtemp(join(tmpdir(), "stunthog-input-"));
 
     try {
       await prepareWorkspaceSource(

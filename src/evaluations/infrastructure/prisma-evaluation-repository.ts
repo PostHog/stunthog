@@ -32,6 +32,7 @@ export class PrismaEvaluationRepository extends EvaluationRepository {
       revision: record.revision,
       environmentId: record.environmentId,
       personaId: record.personaId,
+      responseOverrides: record.responseOverrides,
       judge: record.judge,
       criteria: record.criteria.map(({ id, description }) => ({
         id,
@@ -60,6 +61,7 @@ export class PrismaEvaluationRepository extends EvaluationRepository {
   async save(evaluation: Evaluation): Promise<void> {
     const data = evaluation.snapshot();
     const values = {
+      responseOverrides: data.responseOverrides ?? [],
       title: data.title,
       prompt: data.prompt,
       revision: data.revision,

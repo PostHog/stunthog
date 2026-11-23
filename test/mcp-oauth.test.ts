@@ -11,8 +11,8 @@ import { Database } from "../src/infrastructure/database.js";
 import { migrateDatabase } from "../src/infrastructure/migrations.js";
 
 test("MCP URL and OAuth credentials survive restart and concurrent use refreshes once", async () => {
-  const data = await mkdtemp(join(tmpdir(), "agent-eval-mcp-"));
-  const previousDirectory = process.env.AGENT_EVAL_DATA_DIR;
+  const data = await mkdtemp(join(tmpdir(), "stunthog-mcp-"));
+  const previousDirectory = process.env.STUNTHOG_DATA_DIR;
   const previousUrl = process.env.DATABASE_URL;
   await migrateDatabase(data);
   const db = new Database();
@@ -101,8 +101,8 @@ test("MCP URL and OAuth credentials survive restart and concurrent use refreshes
     await server.stop(true);
     await db.$disconnect();
     await rm(data, { recursive: true, force: true });
-    if (previousDirectory === undefined) delete process.env.AGENT_EVAL_DATA_DIR;
-    else process.env.AGENT_EVAL_DATA_DIR = previousDirectory;
+    if (previousDirectory === undefined) delete process.env.STUNTHOG_DATA_DIR;
+    else process.env.STUNTHOG_DATA_DIR = previousDirectory;
     if (previousUrl === undefined) delete process.env.DATABASE_URL;
     else process.env.DATABASE_URL = previousUrl;
   }

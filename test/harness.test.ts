@@ -46,7 +46,7 @@ test("native adapters keep credentials out of arguments and disable judge tools"
         JSON.stringify(command.args),
         /secret-key|secret-mcp-token/,
       );
-      assert.equal(command.env.AGENT_EVAL_MCP_TOKEN_0, "secret-mcp-token");
+      assert.equal(command.env.STUNTHOG_MCP_TOKEN_0, "secret-mcp-token");
 
       if (id === "claude") {
         const configPath =
@@ -56,7 +56,7 @@ test("native adapters keep credentials out of arguments and disable judge tools"
         assert.deepEqual(config.mcpServers.eval_0, {
           type: "http",
           url: "https://example.com/mcp",
-          headers: { Authorization: `Bearer \${AGENT_EVAL_MCP_TOKEN_0}` },
+          headers: { Authorization: `Bearer \${STUNTHOG_MCP_TOKEN_0}` },
         });
       }
 

@@ -17,6 +17,7 @@ import {
   Field,
   money,
   Notice,
+  number,
   Status,
 } from "../components.js";
 import { ModelReference } from "../models/ModelReference.js";
@@ -125,6 +126,7 @@ export function SessionsTable({ sessions }: { sessions: Session[] }) {
                 <TableHead>Criteria</TableHead>
                 <TableHead>Judge verdict</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>Intercepted calls</TableHead>
                 <TableHead>Duration</TableHead>
                 <TableHead>Est. cost</TableHead>
                 <TableHead>Created</TableHead>
@@ -166,6 +168,7 @@ export function SessionsTable({ sessions }: { sessions: Session[] }) {
                   <TableCell>
                     <Status value={session.status} />
                   </TableCell>
+                  <TableCell>{number(session.interceptedCalls)}</TableCell>
                   <TableCell>{duration(session.durationMs)}</TableCell>
                   <TableCell>{money(session.costUsd)}</TableCell>
                   <TableCell>

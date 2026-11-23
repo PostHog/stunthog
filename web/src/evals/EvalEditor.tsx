@@ -6,6 +6,7 @@ import type {
 } from "../../../src/settings/domain/application-settings.js";
 import { api, useApi } from "../api.js";
 import { Field, Notice, PageTitle } from "../components.js";
+import { EvalOverrides } from "../overrides/EvalOverrides.js";
 import { RequestState } from "../PageState.js";
 import { StatusIcon } from "../status/StatusIcon.js";
 import type {
@@ -213,6 +214,12 @@ function Editor({
           refreshResources={refreshResources}
           resourcesLoading={resourcesLoading}
           judgeHarness={judgeHarness}
+        />
+        <EvalOverrides
+          refreshResources={refreshResources}
+          value={value}
+          onChange={setValue}
+          resources={resources}
         />
         <div className="form-actions">
           <Notice error={error} />

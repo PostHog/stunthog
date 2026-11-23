@@ -15,13 +15,14 @@ import { api, useApi } from "../api.js";
 import { Choice } from "../Choice.js";
 import { Acceptance, Field, Notice, PageTitle } from "../components.js";
 import { ModelKey } from "../models/ModelReference.js";
+import { ResponseOverrideList } from "../overrides/ResponseOverrideList.js";
 import { Feedback, RequestState } from "../PageState.js";
 import { SessionsTable } from "../sessions/SessionList.js";
 import { isActive } from "../sessions/session-filters.js";
 import { UsageSummary } from "../sessions/UsageSummary.js";
 import { RunProgress } from "../status/RunProgress.js";
 import { StatusIcon } from "../status/StatusIcon.js";
-import type { EvaluationData, Session } from "../types.js";
+import type { EvaluationData, Resources, Session } from "../types.js";
 import { criterionDecisions } from "./acceptance.js";
 import { EvalConfiguration } from "./EvalConfiguration.js";
 import { RunComparison } from "./RunComparison.js";
@@ -37,6 +38,7 @@ export function EvalDetail({ id }: { id: string }) {
     error: sessionsError,
     refresh,
   } = useApi<Session[]>(`/sessions?evalId=${id}`, true);
+  const { data: resources } = useApi<Resources>("/resources");
   const [runError, setRunError] = useState("");
   const [starting, setStarting] = useState(false);
   const [batch, setBatch] = useState("latest");
@@ -218,9 +220,15 @@ export function EvalDetail({ id }: { id: string }) {
         </section>
         <EvalConfiguration
           definition={definition}
+          resources={resources}
           snapshot={sessions[0]?.snapshot}
         />
       </div>
+      <ResponseOverrideList
+        title="Current response overrides"
+        rules={evaluation.responseOverrides}
+        servers={resources?.mcps}
+      />
       {sessions.length > 0 && <UsageSummary sessions={sessions} />}
       <section className="section">
         <h2>Agent sessions</h2>

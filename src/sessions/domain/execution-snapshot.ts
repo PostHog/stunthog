@@ -13,6 +13,7 @@ export interface ExecutionSnapshot {
   persona: { title: string; description: string } | null;
   skills: { title: string; content: string }[];
   mcps: {
+    id?: string;
     title: string;
     url?: string | null;
     command: string;

@@ -21,14 +21,14 @@ test(
       process.platform === "win32" ? "Requires a Unix Docker fixture." : false,
   },
   async () => {
-    const root = await mkdtemp(join(tmpdir(), "agent-eval-docker-"));
+    const root = await mkdtemp(join(tmpdir(), "stunthog-docker-"));
     const bin = join(root, "bin");
     const workspace = join(root, "workspace");
     const dockerfile = join(root, "Dockerfile");
     const log = join(root, "docker.log");
     const previousPath = process.env.PATH;
     const previousKey = process.env.ANTHROPIC_API_KEY;
-    const previousLog = process.env.AGENT_EVAL_DOCKER_LOG;
+    const previousLog = process.env.STUNTHOG_DOCKER_LOG;
 
     try {
       await mkdir(bin);
@@ -36,11 +36,11 @@ test(
       await writeFile(dockerfile, "FROM scratch\n");
       await writeFile(
         join(bin, "docker"),
-        '#!/bin/sh\necho "$@" >> "$AGENT_EVAL_DOCKER_LOG"\ncase "$1" in\n  build) echo sha256:test ;;\n  run) echo container-test ;;\nesac\n',
+        '#!/bin/sh\necho "$@" >> "$STUNTHOG_DOCKER_LOG"\ncase "$1" in\n  build) echo sha256:test ;;\n  run) echo container-test ;;\nesac\n',
       );
       await chmod(join(bin, "docker"), 0o700);
       process.env.PATH = `${bin}${delimiter}${previousPath ?? ""}`;
-      process.env.AGENT_EVAL_DOCKER_LOG = log;
+      process.env.STUNTHOG_DOCKER_LOG = log;
       const key = "anthropic-fixture-key";
       process.env.ANTHROPIC_API_KEY = key;
 
@@ -73,7 +73,7 @@ test(
         "exec",
         "--interactive",
         "--workdir",
-        "/agent-eval/workspace",
+        "/stunthog/workspace",
         "--env-file",
       ]);
       assert.deepEqual(command.args.slice(-3), [
@@ -171,7 +171,7 @@ test(
       assert.match(calls, /run --detach --rm/);
       assert.match(
         calls,
-        /exec --interactive --workdir \/agent-eval\/workspace --env-file/,
+        /exec --interactive --workdir \/stunthog\/workspace --env-file/,
       );
       assert.match(calls, /rm --force container-test/);
     } finally {
@@ -179,8 +179,8 @@ test(
       else process.env.ANTHROPIC_API_KEY = previousKey;
       if (previousPath === undefined) delete process.env.PATH;
       else process.env.PATH = previousPath;
-      if (previousLog === undefined) delete process.env.AGENT_EVAL_DOCKER_LOG;
-      else process.env.AGENT_EVAL_DOCKER_LOG = previousLog;
+      if (previousLog === undefined) delete process.env.STUNTHOG_DOCKER_LOG;
+      else process.env.STUNTHOG_DOCKER_LOG = previousLog;
       await rm(root, { recursive: true, force: true });
     }
   },

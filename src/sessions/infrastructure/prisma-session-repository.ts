@@ -5,6 +5,8 @@ import { Database } from "../../infrastructure/database.js";
 import type { ExecutionSnapshot } from "../domain/execution-snapshot.js";
 import type { Session } from "../domain/session.js";
 import { SessionRepository } from "../domain/session-repository.js";
+import { callUpdates } from "../domain/tool-call.js";
+import { toolCallRows, upsertCall } from "./tool-call-index.js";
 
 export const json = (value: unknown): Prisma.InputJsonValue =>
   JSON.parse(JSON.stringify(value));
@@ -110,19 +112,28 @@ export class PrismaSessionRepository extends SessionRepository {
   }
 
   async event(sessionId: string, phase: string, event: unknown): Promise<void> {
-    const last = await this.db.sessionEvent.findFirst({
-      where: { sessionId },
-      orderBy: { sequence: "desc" },
-      select: { sequence: true },
-    });
-
-    await this.db.sessionEvent.create({
-      data: {
+    // Allocate the sequence in the insert. Parallel tool results share this stream.
+    const insert = (db: Prisma.TransactionClient) => db.$queryRaw<
+      { sequence: number }[]
+    >`INSERT INTO SessionEvent (sessionId,phase,sequence,event)
+      SELECT ${sessionId},${phase},COALESCE(MAX(sequence),0)+1,${JSON.stringify(event)}
+      FROM SessionEvent WHERE sessionId=${sessionId} RETURNING sequence`;
+    const updates = phase === "response" ? [] : callUpdates(event);
+    if (!updates.length) {
+      await insert(this.db);
+      return;
+    }
+    await this.db.$transaction(async (tx) => {
+      const [row] = await insert(tx);
+      if (!row) throw new Error("Cannot record the tool call.");
+      for (const values of toolCallRows(
         sessionId,
         phase,
-        sequence: (last?.sequence ?? 0) + 1,
-        event: json(event),
-      },
+        updates,
+        row.sequence,
+        Date.now(),
+      ))
+        await tx.$executeRawUnsafe(upsertCall, ...values);
     });
   }
 

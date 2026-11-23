@@ -5,7 +5,7 @@ const { chmod, mkdir, mkdtemp, rename, rm } = require("node:fs/promises");
 const { join } = require("node:path");
 const { Transform } = require("node:stream");
 const { pipeline } = require("node:stream/promises");
-const { binaryName } = require("./agent-eval.cjs");
+const { binaryName } = require("./stunthog.cjs");
 
 async function install() {
   const name = binaryName(process.platform, process.arch);
@@ -19,9 +19,9 @@ async function install() {
   const temporary = await mkdtemp(join(destination, ".download-"));
 
   try {
-    const url = `https://github.com/PostHog/agent-eval/releases/download/v${encodeURIComponent(version)}/${archive}`;
+    const url = `https://github.com/PostHog/stunthog/releases/download/v${encodeURIComponent(version)}/${archive}`;
     console.log(
-      `Downloading agent-eval ${version} for ${process.platform}/${process.arch}…`,
+      `Downloading StuntHog ${version} for ${process.platform}/${process.arch}…`,
     );
     const response = await fetch(url, { signal: AbortSignal.timeout(300_000) });
     if (!response.ok || !response.body)
@@ -60,6 +60,6 @@ async function install() {
 }
 
 install().catch((error) => {
-  console.error(`Could not install agent-eval: ${error.message}`);
+  console.error(`Could not install StuntHog: ${error.message}`);
   process.exitCode = 1;
 });

@@ -29,6 +29,7 @@ function session(status: string): Session {
 
   return {
     id: status,
+    interceptedCalls: 0,
     evalId: evaluation.id,
     batchId: "run",
     model: model.model,

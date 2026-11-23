@@ -1,4 +1,4 @@
-import { resolve, sep } from "node:path";
+import { extname, resolve, sep } from "node:path";
 import type { NestExpressApplication } from "@nestjs/platform-express";
 import { runtimePath } from "./runtime-path.js";
 
@@ -35,7 +35,7 @@ export function serveWebAssets(app: NestExpressApplication): void {
             ? requested
             : resolve(root, "index.html");
 
-        response.type(file);
+        response.type(extname(file));
         response.send(new Uint8Array(await Bun.file(file).arrayBuffer()));
       } catch (error) {
         next(error);

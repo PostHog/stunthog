@@ -51,6 +51,7 @@ export interface Decision {
   feedback: string;
 }
 export interface Session {
+  interceptedCalls: number;
   id: string;
   evalId: string;
   batchId: string;

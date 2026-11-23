@@ -1,7 +1,11 @@
 import { Button, Input } from "@posthog/quill";
 import { useMemo, useRef, useState } from "react";
+import type { ResponseCapture } from "../../../src/overrides/domain/response-override.js";
+import { api } from "../api.js";
 import { Notice } from "../components.js";
 import { ModelReference } from "../models/ModelReference.js";
+import { OverrideDialog } from "../overrides/OverrideDialog.js";
+import { withResponses } from "../overrides/response-entries.js";
 import { LoadingState } from "../PageState.js";
 import type { Session } from "../types.js";
 import { markdownText } from "./Markdown.js";
@@ -44,7 +48,22 @@ export function LogPanel({
     () => events.filter((event) => event.phase === phase),
     [events, phase],
   );
-  const entries = useMemo(() => buildTranscript(phaseEvents), [phaseEvents]);
+  const entries = useMemo(() => {
+    const transcript = buildTranscript(phaseEvents);
+    return phase === "agent"
+      ? withResponses(
+          transcript,
+          events.filter((e) => e.phase === "response"),
+          session.snapshot,
+        )
+      : transcript;
+  }, [phaseEvents, events, session, phase]);
+  const [creating, setCreating] = useState<{
+    entryId: string;
+    sample: ResponseCapture;
+    selection: string;
+  } | null>(null);
+  const [saved, setSaved] = useState<string>();
   const query = search.trim();
   const searching = query.length > 0;
   const searchIndex = useMemo(
@@ -166,7 +185,55 @@ export function LogPanel({
               key={entry.id}
               entry={entry}
               matches={matches.get(entry.id)}
-            />
+              editing={creating?.entryId === entry.id}
+              onOverride={(sample, selection) => {
+                setSaved(undefined);
+                setCreating((current) =>
+                  current?.entryId === entry.id
+                    ? null
+                    : { entryId: entry.id, sample, selection },
+                );
+              }}
+            >
+              {creating?.entryId === entry.id && (
+                <OverrideDialog
+                  inline
+                  sample={creating.sample}
+                  selection={creating.selection}
+                  servers={session.snapshot.mcps
+                    .map((s, i) => ({
+                      id: s.id ?? session.snapshot.evaluation.mcpIds[i] ?? "",
+                      title: s.title,
+                    }))
+                    .filter((s) => s.id)}
+                  evaluationTitle={session.eval.title}
+                  applyLabel="Save to evaluation"
+                  onClose={() => {
+                    setCreating((current) =>
+                      current?.entryId === entry.id ? null : current,
+                    );
+                    const trigger = document.getElementById(
+                      `intercept-${entry.id}`,
+                    );
+                    if (trigger?.getAttribute("aria-expanded") === "true")
+                      trigger.focus({ preventScroll: true });
+                  }}
+                  onApply={async (rule) => {
+                    await api(`/evals/${session.evalId}/response-overrides`, {
+                      method: "POST",
+                      body: JSON.stringify(rule),
+                    });
+                    setSaved(entry.id);
+                  }}
+                />
+              )}
+              {saved === entry.id && (
+                <output className="trace-intercept-saved">
+                  Saved for the next run.{" "}
+                  <a href={`#evals/${session.evalId}/edit`}>View evaluation</a>
+                </output>
+              )}
+            </TranscriptRow>
           ))}
           {visible.length > shown.length && (
             <Button

@@ -7,8 +7,14 @@ import {
   Post,
   Put,
 } from "@nestjs/common";
+import { z } from "zod";
 import { EvaluationsService } from "../evaluations/application/evaluations-service.js";
 import { Database } from "../infrastructure/database.js";
+import {
+  rewriteResponse,
+  ruleSchema,
+  targetSchema,
+} from "../overrides/domain/response-override.js";
 import { StartSessions } from "../sessions/application/start-sessions.js";
 
 @Controller("api/evals")
@@ -55,6 +61,24 @@ export class EvaluationsController {
   @Put(":id")
   update(@Param("id") id: string, @Body() input: unknown) {
     return this.evals.save(input, id);
+  }
+
+  @Post("response-overrides/preview")
+  previewOverride(@Body() input: unknown) {
+    const sample = z
+      .object({
+        rule: ruleSchema,
+        target: targetSchema,
+        args: z.record(z.unknown()),
+        original: z.union([z.string(), z.record(z.unknown())]),
+      })
+      .parse(input);
+    return rewriteResponse([sample.rule], sample, sample.original);
+  }
+
+  @Post(":id/response-overrides")
+  addOverride(@Param("id") id: string, @Body() input: unknown) {
+    return this.evals.addOverride(id, ruleSchema.parse(input));
   }
 
   @Post(":id/run")

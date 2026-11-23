@@ -1,4 +1,4 @@
-# Agent eval design
+# StuntHog design
 
 This is a local research tool for PostHog engineers. Users define evals,
 compare sessions, and inspect the evidence for each judge decision.
@@ -14,8 +14,8 @@ Do not add marketing sections or decorative dashboard cards.
 - Surfaces, text, borders, focus, and status colors: Quill semantic tokens.
 - Root font size: 16px, so Quill rem-based controls retain their intended size.
 - App body: 13px. Preserve the compact research layout.
-- App name: `agent-eval`, lowercase. Sidebar brand: the supplied
-  `images/agent-eval-logo-brand.png`, shown in full at its original aspect ratio.
+- Use **StuntHog** in the interface and `stunthog` for the command.
+  The sidebar pairs the name with `images/posthog-hedgehog-evel.png`.
 - Sidebar: Workspace, Resources, and Settings groups; gold current-page state.
   Keep New eval next to the brand on narrow screens. PostHog wordmark and a
   small research hedgehog sit in the desktop footer.

@@ -1,5 +1,10 @@
 import type { ModelSettingsData } from "../../evaluations/domain/model-settings.js";
 
+import type {
+  ResponseCapture,
+  ResponseRule,
+} from "../../overrides/domain/response-override.js";
+
 export interface ProcessCommand {
   binary: string;
   args: string[];
@@ -16,6 +21,7 @@ export interface ShellOptions {
 
 export interface HarnessRuntime {
   readonly kind: "local" | "docker";
+  filePath?(path: string): string;
   process(command: ProcessCommand, cwd: string): Promise<ProcessCommand>;
   shell(
     command: string,
@@ -26,6 +32,8 @@ export interface HarnessRuntime {
 }
 
 export interface McpServer {
+  id?: string;
+  required?: boolean;
   url?: string | null;
   accessToken?: string | undefined;
   title: string;
@@ -59,6 +67,8 @@ export interface HarnessRequest {
   persona?: string;
   apiKey?: string;
   mcps?: McpServer[];
+  responseOverrides?: ResponseRule[];
+  onToolResponse?: (capture: ResponseCapture) => Promise<void>;
   onRawEvent?: (event: unknown) => Promise<void>;
   runtime?: HarnessRuntime;
 }

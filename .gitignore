@@ -4,6 +4,7 @@ node_modules/
 dist/
 release/
 runs/
+.stunthog/
 .agent-eval/
 *.db
 *.db-journal

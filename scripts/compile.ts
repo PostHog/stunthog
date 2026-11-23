@@ -4,7 +4,7 @@ import { resolve } from "node:path";
 const releaseDirectory = resolve("release");
 const executable = resolve(
   releaseDirectory,
-  process.platform === "win32" ? "agent-eval.exe" : "agent-eval",
+  process.platform === "win32" ? "stunthog.exe" : "stunthog",
 );
 
 await rm(releaseDirectory, { recursive: true, force: true });
@@ -28,6 +28,6 @@ const result = await Bun.build({
 });
 
 if (!result.success)
-  throw new AggregateError(result.logs, "Could not compile agent-eval.");
+  throw new AggregateError(result.logs, "Could not compile StuntHog.");
 
 console.log(executable);

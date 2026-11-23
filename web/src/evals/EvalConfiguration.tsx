@@ -1,15 +1,15 @@
-import { useApi } from "../api.js";
 import { ModelReference } from "../models/ModelReference.js";
 import type { EvaluationData, Resources, Session } from "../types.js";
 
 export function EvalConfiguration({
   definition,
   snapshot,
+  resources: data,
 }: {
   definition: EvaluationData;
+  resources: Resources | undefined;
   snapshot?: Session["snapshot"];
 }) {
-  const { data } = useApi<Resources>("/resources");
   const environment = snapshot
     ? snapshot.environment?.title
     : data?.environments.find((item) => item.id === definition.environmentId)
@@ -63,6 +63,12 @@ export function EvalConfiguration({
               ? `${definition.mcpIds.length} selected`
               : "None")}
         </dd>
+        {!!definition.responseOverrides?.length && (
+          <>
+            <dt>Response overrides</dt>
+            <dd>{definition.responseOverrides.length}</dd>
+          </>
+        )}
         <dt>Session models</dt>
         {definition.models.map((model, index) => (
           <dd key={`${index}-${model.model}`}>

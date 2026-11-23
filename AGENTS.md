@@ -1,10 +1,10 @@
 # Engineering directives
 
-These directives preserve the project's requirements and decisions. Apply them when changing agent-eval. Later, explicit user instructions take precedence.
+These directives preserve the project's requirements and decisions. Apply them when changing StuntHog. Later, explicit user instructions take precedence.
 
 ## Product and stack
 
-- The application is **agent-eval**, spelled in lowercase. It evaluates how coding agents use tools and complete tasks, including PostHog integrations and the developing `hog` CLI.
+- Use **StuntHog** for the application name and `stunthog` for the CLI and repository. It evaluates how coding agents use tools and complete tasks, including PostHog integrations and the developing `hog` CLI.
 - The CLI is the entry point. Use NestJS and Nest Commander to start the local server and web application. Users must be able to open saved results without starting an evaluation.
 - Use Bun for the application runtime, dependency management, builds, and tests. Example projects can retain their own package managers.
 - Use React, Vite, Tailwind, and PostHog's Quill components for the web application. All configuration and report workflows belong in the web app; do not restore the YAML runner or standalone file-report implementation.
@@ -37,7 +37,7 @@ These directives preserve the project's requirements and decisions. Apply them w
 - Docker environments support an inspectable default image or a custom Dockerfile supplied as a local file or inline content. Ensure the selected native harness is available in the container.
 - Harnesses need web access for research and tool use. Preserve web/tool evidence in session traces.
 - A custom environment can preinstall a tool under evaluation. When testing the developing PostHog `hog` CLI, verify the intended source/version; do not substitute the deprecated `posthog-cli` package based on its name.
-- Default application data to `~/.agent-eval/agent-eval.db`, independent of the launch directory. Keep `credential.key` and catalog state in the same data directory. `--data` overrides `AGENT_EVAL_DATA_DIR`, which overrides the home default.
+- Default application data to `~/.stunthog/stunthog.db`, independent of the launch directory. Keep `credential.key` and catalog state in the same data directory. `--data` overrides `STUNTHOG_DATA_DIR`, which overrides the home default.
 - Use the shared data-directory resolver. Do not add new working-directory-based database or key paths.
 - Apply committed Prisma migrations at startup, including in compiled releases. Add a migration for schema changes and preserve existing records and settings.
 - Do not overwrite or merge existing databases implicitly. Moving an older database requires its credential key as well; keep old project-local data recoverable.
@@ -60,7 +60,7 @@ These directives preserve the project's requirements and decisions. Apply them w
 
 - Apply the `asd-ste100` skill to all app copy, including labels, help text, errors, status messages, and CLI output. Use active voice, consistent terms, and one instruction per sentence. Limit instructions to 20 words and descriptions to 25 words per sentence. Preserve conditions, uncertainty, and technical terms. Apply these rules to new and existing copy.
 
-- Follow the PostHog brand system and Quill. Reuse the supplied assets, fonts, and `images/agent-eval-logo-brand.png`; retain PostHog attribution. Keep the sidebar compact without the strong yellow selection notch.
+- Follow the PostHog brand system and Quill. Use the supplied fonts and stunt hedgehog in `images/posthog-hedgehog-evel.png`. Retain PostHog attribution. Keep the sidebar compact without the strong yellow selection notch.
 - Use clear hierarchy, technical labels, useful icons, and compact layouts. User-facing navigation says **Evaluations**.
 - Keep criteria open by default on evaluation detail pages. In create/edit forms, show a readable criterion list and open a richer editor dialog when a criterion is selected.
 - Use reusable model/harness references with harness logos and model display names. Criterion-bar tooltips identify the criterion and result.
@@ -77,4 +77,4 @@ These directives preserve the project's requirements and decisions. Apply them w
 - Test migration compatibility and persistence across restart for storage changes. Test that edits to defaults do not change existing evaluations.
 - Distribute standalone executables containing the runtime, UI, and migrations. Maintain release workflows for macOS ARM64/x64, Linux ARM64/x64, and Windows x64, with startup smoke tests, archives, and checksums on GitHub Releases.
 - When asked to release, verify checks and publishing outcomes, keep package versions and tags aligned, and report the release link and any unverified behavior.
-- Distribute one public npm package, `@posthog/agent-eval`, with a Node launcher. Its npm postinstall downloads only the matching GitHub release archive and verifies its SHA-256 against the package manifest. Keep the development package private; generate the distribution manifest separately. Publish through GitHub Actions OIDC from `release.yml` using the `npm` environment. Publishing requires the package's trusted publisher to be configured on npm.
+- Distribute one public npm package, `@posthog/stunthog`, with a Node launcher. Its npm postinstall downloads only the matching GitHub release archive and verifies its SHA-256 against the package manifest. Keep the development package private; generate the distribution manifest separately. Publish through GitHub Actions OIDC from `release.yml` using the `npm` environment. Publishing requires the package's trusted publisher to be configured on npm.

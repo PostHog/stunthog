@@ -6,7 +6,7 @@ import { test } from "node:test";
 import { loadEnvironment } from "../src/infrastructure/environment.js";
 
 test("loads the OpenRouter key from an env file", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "agent-eval-env-"));
+  const directory = await mkdtemp(join(tmpdir(), "stunthog-env-"));
   const previous = process.env.OPENROUTER_API_KEY;
 
   delete process.env.OPENROUTER_API_KEY;

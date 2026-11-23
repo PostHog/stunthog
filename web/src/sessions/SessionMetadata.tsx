@@ -1,5 +1,33 @@
+import {
+  IconCalendar,
+  IconClock,
+  IconDatabase,
+  IconFolder,
+  IconListCheck,
+  IconPerson,
+  IconPlug,
+  IconReceipt,
+  IconShuffle,
+  IconSort,
+  IconStack,
+} from "@posthog/icons";
 import { duration, money, number } from "../components.js";
 import type { Session } from "../types.js";
+
+function DetailLabel({
+  icon: Icon,
+  children,
+}: {
+  icon: typeof IconPerson;
+  children: string;
+}) {
+  return (
+    <dt>
+      <Icon aria-hidden="true" />
+      {children}
+    </dt>
+  );
+}
 
 export function SessionMetadata({ session }: { session: Session }) {
   const snapshot = session.snapshot;
@@ -7,21 +35,25 @@ export function SessionMetadata({ session }: { session: Session }) {
   return (
     <dl className="session-metadata">
       <div>
-        <dt>Persona</dt>
+        <DetailLabel icon={IconPerson}>Persona</DetailLabel>
         <dd>{snapshot.persona?.title ?? "None"}</dd>
       </div>
       <div>
-        <dt>Environment</dt>
+        <DetailLabel icon={IconFolder}>Environment</DetailLabel>
         <dd>{snapshot.environment?.title ?? "Empty workspace"}</dd>
       </div>
       <div>
-        <dt>Skills / MCP servers</dt>
+        <DetailLabel icon={IconPlug}>Skills / MCP servers</DetailLabel>
         <dd>
           {snapshot.skills.length} / {snapshot.mcps.length}
         </dd>
       </div>
       <div>
-        <dt>Started</dt>
+        <DetailLabel icon={IconShuffle}>Intercepted calls</DetailLabel>
+        <dd>{number(session.interceptedCalls)}</dd>
+      </div>
+      <div>
+        <DetailLabel icon={IconCalendar}>Started</DetailLabel>
         <dd>
           {session.startedAt
             ? new Date(session.startedAt).toLocaleString()
@@ -29,31 +61,31 @@ export function SessionMetadata({ session }: { session: Session }) {
         </dd>
       </div>
       <div>
-        <dt>Duration</dt>
+        <DetailLabel icon={IconClock}>Duration</DetailLabel>
         <dd>{duration(session.durationMs)}</dd>
       </div>
       <div>
-        <dt>Tokens in / out</dt>
+        <DetailLabel icon={IconSort}>Tokens in / out</DetailLabel>
         <dd>
           {number(session.inputTokens)} / {number(session.outputTokens)}
         </dd>
       </div>
       <div>
-        <dt>Cache read / write</dt>
+        <DetailLabel icon={IconDatabase}>Cache read / write</DetailLabel>
         <dd>
           {number(session.cacheRead)} / {number(session.cacheWrite)}
         </dd>
       </div>
       <div>
-        <dt>Total tokens</dt>
+        <DetailLabel icon={IconStack}>Total tokens</DetailLabel>
         <dd>{number(session.totalTokens)}</dd>
       </div>
       <div>
-        <dt>Estimated USD</dt>
+        <DetailLabel icon={IconReceipt}>Estimated USD</DetailLabel>
         <dd>{money(session.costUsd)}</dd>
       </div>
       <div>
-        <dt>Evaluation</dt>
+        <DetailLabel icon={IconListCheck}>Evaluation</DetailLabel>
         <dd className="eval-outcome">
           <span className="pass">
             {session.decisions.filter((decision) => decision.passed).length}{" "}

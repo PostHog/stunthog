@@ -10,7 +10,7 @@ import { prepareWorkspaceSource } from "../src/sessions/infrastructure/workspace
 const execute = promisify(execFile);
 
 test("a repository environment clones an independent workspace", async () => {
-  const root = await mkdtemp(join(tmpdir(), "agent-eval-repository-"));
+  const root = await mkdtemp(join(tmpdir(), "stunthog-repository-"));
   const source = join(root, "source");
   const target = join(root, "target");
 

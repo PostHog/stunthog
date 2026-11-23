@@ -6,7 +6,7 @@ import { test } from "node:test";
 import { FilesystemController } from "../src/http/filesystem-controller.js";
 
 test("the local path picker lists folders and requested files", async () => {
-  const root = await mkdtemp(join(tmpdir(), "agent-eval-picker-"));
+  const root = await mkdtemp(join(tmpdir(), "stunthog-picker-"));
 
   try {
     await mkdir(join(root, "project"));

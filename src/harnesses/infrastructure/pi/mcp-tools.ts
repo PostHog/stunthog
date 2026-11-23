@@ -4,6 +4,7 @@ import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import type { TSchema } from "typebox";
 import { z } from "zod";
+import { deliverResponse } from "../../../overrides/infrastructure/deliver.js";
 import type {
   HarnessRequest,
   McpServer,
@@ -19,7 +20,7 @@ export async function connectMcpTools(request: HarnessRequest) {
 
   try {
     for (const [index, server] of (request.mcps ?? []).entries()) {
-      const client = new Client({ name: "agent-eval", version: "1.0.0" });
+      const client = new Client({ name: "stunthog", version: "1.0.0" });
 
       clients.push(client);
 
@@ -62,7 +63,7 @@ export async function connectMcpTools(request: HarnessRequest) {
             label: `${server.title}: ${tool.name}`,
             description: tool.description ?? tool.name,
             parameters: tool.inputSchema as TSchema,
-            execute: async (_id, args, signal) => {
+            execute: async (id, args, signal) => {
               const result = await client.callTool(
                 {
                   name: tool.name,
@@ -72,8 +73,27 @@ export async function connectMcpTools(request: HarnessRequest) {
                 { ...(signal ? { signal } : {}), timeout: 30_000 },
               );
 
+              const delivered =
+                server.id &&
+                (request.onToolResponse || request.responseOverrides?.length)
+                  ? await deliverResponse(
+                      request.responseOverrides ?? [],
+                      {
+                        target: {
+                          kind: "mcp",
+                          serverId: server.id,
+                          tool: tool.name,
+                        },
+                        args: z.record(z.unknown()).parse(args),
+                      },
+                      result,
+                      id,
+                      "Pi MCP",
+                      request.onToolResponse,
+                    )
+                  : result;
               return {
-                content: [{ type: "text", text: JSON.stringify(result) }],
+                content: [{ type: "text", text: JSON.stringify(delivered) }],
                 details: {},
                 isError: result.isError === true,
               };

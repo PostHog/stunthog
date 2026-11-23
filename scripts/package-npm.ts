@@ -11,9 +11,7 @@ import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repository = fileURLToPath(new URL("../", import.meta.url));
-const { binaries } = createRequire(import.meta.url)(
-  "../npm/agent-eval.cjs",
-) as {
+const { binaries } = createRequire(import.meta.url)("../npm/stunthog.cjs") as {
   binaries: Record<string, string>;
 };
 
@@ -47,12 +45,12 @@ export async function packageNpm(
   }
   await rm(outputDirectory, { recursive: true, force: true });
   await mkdir(join(outputDirectory, "bin"), { recursive: true });
-  for (const file of ["agent-eval.cjs", "install.cjs"])
+  for (const file of ["stunthog.cjs", "install.cjs"])
     await copyFile(
       join(repository, "npm", file),
       join(outputDirectory, "bin", file),
     );
-  await chmod(join(outputDirectory, "bin/agent-eval.cjs"), 0o755);
+  await chmod(join(outputDirectory, "bin/stunthog.cjs"), 0o755);
   await writeFile(
     join(outputDirectory, "bin/checksums.json"),
     JSON.stringify(checksums),
@@ -61,19 +59,19 @@ export async function packageNpm(
   await writeFile(
     join(outputDirectory, "README.md"),
     readme.replaceAll(
-      "](images/",
-      `](https://raw.githubusercontent.com/PostHog/agent-eval/v${version}/images/`,
+      /(\]\(|src=")images\//g,
+      `$1https://raw.githubusercontent.com/PostHog/stunthog/v${version}/images/`,
     ),
   );
   await writeFile(
     join(outputDirectory, "package.json"),
     `${JSON.stringify(
       {
-        name: "@posthog/agent-eval",
+        name: "@posthog/stunthog",
         version,
         description:
           "Evaluate coding agents in isolated workspaces with a local web app.",
-        bin: { "agent-eval": "bin/agent-eval.cjs" },
+        bin: { stunthog: "bin/stunthog.cjs" },
         files: ["bin"],
         scripts: { postinstall: "node bin/install.cjs" },
         engines: { node: ">=22" },
@@ -81,10 +79,10 @@ export async function packageNpm(
         cpu: ["arm64", "x64"],
         repository: {
           type: "git",
-          url: "git+https://github.com/PostHog/agent-eval.git",
+          url: "git+https://github.com/PostHog/stunthog.git",
         },
-        homepage: "https://github.com/PostHog/agent-eval#readme",
-        bugs: { url: "https://github.com/PostHog/agent-eval/issues" },
+        homepage: "https://github.com/PostHog/stunthog#readme",
+        bugs: { url: "https://github.com/PostHog/stunthog/issues" },
         publishConfig: { access: "public" },
       },
       null,

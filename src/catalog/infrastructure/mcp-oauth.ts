@@ -149,7 +149,7 @@ export class McpOAuth extends McpAuthorization {
     return {
       redirectUrl: saved.redirectUri,
       clientMetadata: {
-        client_name: "agent-eval",
+        client_name: "StuntHog",
         redirect_uris: [saved.redirectUri],
         grant_types: ["authorization_code", "refresh_token"],
         response_types: ["code"],

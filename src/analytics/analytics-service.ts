@@ -33,7 +33,7 @@ export class AnalyticsService implements OnApplicationShutdown {
               },
             }),
             logs: {
-              serviceName: "agent-eval-backend",
+              serviceName: "stunthog-backend",
               beforeSend: (record) => ({
                 ...record,
                 attributes: {

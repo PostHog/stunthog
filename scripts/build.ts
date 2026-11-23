@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
-import { rm } from "node:fs/promises";
+import { rm, writeFile } from "node:fs/promises";
+import { buildRelay } from "../src/overrides/infrastructure/relay-source.js";
 
 async function run(args: string[]) {
   const child = spawn(process.execPath, args, {
@@ -18,4 +19,8 @@ await run(["x", "prisma", "generate"]);
 
 await rm(new URL("../dist", import.meta.url), { recursive: true, force: true });
 await run(["x", "tsc", "-p", "tsconfig.build.json"]);
+await writeFile(
+  new URL("../dist/overrides/infrastructure/relay-source.js", import.meta.url),
+  `export const relaySource = () => ${JSON.stringify(await buildRelay())};\n`,
+);
 await run(["x", "vite", "build", "--config", "web/vite.config.ts"]);

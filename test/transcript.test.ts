@@ -209,3 +209,90 @@ test("transcript search finds typos and supplies offsets for the matching field"
     /OpenTelemet/,
   );
 });
+
+test("recorded edits join repeated native tools by response ID or returned output", async () => {
+  const { withResponses } = await import(
+    "../web/src/overrides/response-entries.js"
+  );
+  const target = { kind: "web", url: "https://example.com" } as const;
+  const calls = ["second", "first", "managed", "same", "same"].map(
+    (text, i) => ({
+      type: "item.completed",
+      item: {
+        type: "mcp_tool_call",
+        id: String(i),
+        server: "eval_0",
+        tool: "web_fetch",
+        arguments: { url: target.url },
+        result: {
+          content: [{ type: "text", text: `URL: ${target.url}\n\n${text}` }],
+          ...(i === 2 && { _meta: { "stunthog/responseId": "c2" } }),
+          ...(i === 3 && { _meta: { "agent-eval/responseId": "c4" } }),
+        },
+      },
+    }),
+  );
+  const captures = ["first", "second", "managed", "same", "same"].map(
+    (text, i) => ({
+      callId: `c${i}`,
+      route: "web fetch",
+      args: { url: target.url },
+      target,
+      original: "previous",
+      delivered: text,
+      ruleId: "r",
+    }),
+  );
+  const trace = withResponses(
+    buildTranscript(rows(...calls)),
+    rows(...captures, captures[0]),
+    { evaluation: { mcpIds: [] }, mcps: [] },
+  );
+  assert.deepEqual(
+    trace.map((entry) => entry.capture?.callId),
+    ["c1", "c0", "c2", "c4", "c3"],
+  );
+  assert.deepEqual(
+    trace.map((entry) => entry.output),
+    ["second", "first", "managed", "same", "same"],
+  );
+});
+
+test("Codex shell traces can start a rule from a baseline and show the later edit on the same tool row", async () => {
+  const { withResponses } = await import(
+    "../web/src/overrides/response-entries.js"
+  );
+  const command = "printf first; printf second";
+  const entries = buildTranscript(
+    rows({
+      type: "item.completed",
+      item: {
+        id: "item_2",
+        type: "command_execution",
+        command: `/bin/zsh -lc '${command}'`,
+        aggregated_output: "firstsecond",
+        exit_code: 0,
+        status: "completed",
+      },
+    }),
+  );
+  const snapshot = { evaluation: { mcpIds: [] }, mcps: [] };
+  const target = { kind: "shell", match: "batch", command } as const;
+  const baseline = withResponses(entries, [], snapshot);
+  assert.deepEqual(baseline[0]?.capture?.target, target);
+  assert.equal(baseline[0]?.capture?.original, "firstsecond");
+  const events = rows({
+    callId: "call_id",
+    route: "Shell",
+    args: { command },
+    target,
+    original: "firstsecond",
+    delivered: "changed",
+    ruleId: "rule",
+  });
+  const trace = withResponses(entries, events, snapshot);
+  assert.equal(trace.length, 1);
+  assert.equal(trace[0]?.id, entries[0]?.id);
+  assert.equal(trace[0]?.capture?.ruleId, "rule");
+  assert.equal(trace[0]?.output, "changed");
+});
