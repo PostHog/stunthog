@@ -3,7 +3,7 @@ const { spawn, spawnSync } = require("node:child_process");
 const { join, resolve } = require("node:path");
 
 const registry = "https://registry.npmjs.org";
-const packageName = "@posthog/stunthog";
+const packageName = "stunthog";
 
 const binaries = {
   "darwin-arm64": "stunthog-darwin-arm64",
@@ -38,7 +38,7 @@ function isNewerVersion(latest, installed) {
 async function checkForUpdate(autoUpdate) {
   let latest;
   try {
-    const response = await fetch(`${registry}/@posthog%2fstunthog/latest`, {
+    const response = await fetch(`${registry}/${packageName}/latest`, {
       signal: AbortSignal.timeout(2000),
     });
     if (!response.ok) return;
@@ -59,7 +59,7 @@ async function checkForUpdate(autoUpdate) {
   }
 
   const windows = process.platform === "win32";
-  const prefix = resolve(__dirname, windows ? "../../../.." : "../../../../..");
+  const prefix = resolve(__dirname, windows ? "../../.." : "../../../..");
   const modules = windows
     ? join(prefix, "node_modules")
     : join(prefix, "lib", "node_modules");

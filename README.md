@@ -10,18 +10,18 @@ StuntHog shows how coding agents complete a task. Give the agents a prompt and d
 
 ### npm
 
-After the first StuntHog release on npm, install the CLI with Node.js 22 or later.
+Install the CLI with Node.js 22 or later.
 
 ```sh
-npm install -g @posthog/stunthog
+npm install -g stunthog
 stunthog
 ```
 
 The npm install script downloads the matching executable archive from GitHub Releases and checks its SHA-256 before extracting it with the system's `tar` command. Install with internet access and npm lifecycle scripts enabled. The executable includes Bun and runs offline after installation. npm's global executable directory must be on your `PATH`.
 
-The npm launcher checks for a newer stable version on startup. Run `stunthog --auto-update` to install an available update before startup. Set `STUNTHOG_AUTO_UPDATE=1` to do this on every launch. To update manually, run `npm install -g @posthog/stunthog@latest`.
+The npm launcher checks for a newer stable version on startup. Run `stunthog --auto-update` to install an available update before startup. Set `STUNTHOG_AUTO_UPDATE=1` to do this on every launch. To update manually, run `npm install -g stunthog@latest`.
 
-Run `npm uninstall -g @posthog/stunthog` to remove the package and its `stunthog` command. Updates and uninstall preserve your data directory. StuntHog applies pending database migrations on startup. Linux builds target glibc. Windows builds target x64.
+Run `npm uninstall -g stunthog` to remove the package and its `stunthog` command. Updates and uninstall preserve your data directory. StuntHog applies pending database migrations on startup. Linux builds target glibc. Windows builds target x64.
 
 ### Standalone executable
 

@@ -46,7 +46,7 @@ test("npm package includes release checksums, no binaries or dependencies, and r
     const manifest = JSON.parse(
       await readFile(join(output, "package.json"), "utf8"),
     );
-    assert.equal(manifest.name, "@posthog/stunthog");
+    assert.equal(manifest.name, "stunthog");
     assert.equal(manifest.bin.stunthog, "bin/stunthog.cjs");
     const readme = await readFile(join(output, "README.md"), "utf8");
     const images = `https://raw.githubusercontent.com/PostHog/stunthog/v${manifest.version}/images`;
@@ -84,13 +84,7 @@ test("npm launcher forwards arguments, terminal IO, signals, exit codes, and spa
   const installs: string[][] = [];
   const notice: string[] = [];
   const prefix = resolve("test prefix");
-  const packageRoot = join(
-    prefix,
-    "lib",
-    "node_modules",
-    "@posthog",
-    "stunthog",
-  );
+  const packageRoot = join(prefix, "lib", "node_modules", "stunthog");
   let latest: string | undefined;
   const args = ["--data", "folder with spaces", "--port", "3210"];
   const fakeProcess = Object.assign(new EventEmitter(), {
@@ -145,10 +139,7 @@ test("npm launcher forwards arguments, terminal IO, signals, exit codes, and spa
       process: fakeProcess,
       AbortSignal,
       fetch: async (url: string) => {
-        assert.equal(
-          url,
-          "https://registry.npmjs.org/@posthog%2fstunthog/latest",
-        );
+        assert.equal(url, "https://registry.npmjs.org/stunthog/latest");
         if (!latest) throw new Error("offline");
         return Response.json({ version: latest });
       },
@@ -171,7 +162,7 @@ test("npm launcher forwards arguments, terminal IO, signals, exit codes, and spa
   child.removeAllListeners();
   fakeProcess.argv.splice(2, 0, "--auto-update");
   await launch();
-  assert.equal(installs[0]?.at(-1), "@posthog/stunthog@0.1.5");
+  assert.equal(installs[0]?.at(-1), "stunthog@0.1.5");
   child.emit("error", new Error("ENOENT"));
   child.emit("close", -2, null);
   assert.match(notice.at(-1) ?? "", /Could not start StuntHog: ENOENT/);

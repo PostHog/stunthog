@@ -67,7 +67,7 @@ export async function packageNpm(
     join(outputDirectory, "package.json"),
     `${JSON.stringify(
       {
-        name: "@posthog/stunthog",
+        name: "stunthog",
         version,
         description:
           "Evaluate coding agents in isolated workspaces with a local web app.",

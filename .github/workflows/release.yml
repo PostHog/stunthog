@@ -198,7 +198,7 @@ jobs:
       - name: Verify uninstall removes the PATH command
         shell: bash
         run: |
-          npm uninstall --global --prefix "$RUNNER_TEMP/npm-prefix" @posthog/stunthog
+          npm uninstall --global --prefix "$RUNNER_TEMP/npm-prefix" stunthog
           hash -r
           if command -v stunthog; then exit 1; fi
 
