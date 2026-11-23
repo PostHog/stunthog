@@ -68,7 +68,7 @@ These directives preserve the project's requirements and decisions. Apply them w
 - Allow inline creation of environments, personas, skills, and MCP servers from evaluation forms.
 - Folder and file inputs accept paths and offer a picker. Inline Dockerfiles open in a dialog with a syntax-highlighted code editor.
 - Review complete user flows when changing a screen. Visually verify UI changes through the Chrome extension when available; disclose when browser verification is unavailable.
-- Keep the README's brand header and demo screenshot intact when editing documentation.
+- Keep the README's stunt hedgehog header intact when editing documentation.
 
 ## Verification and distribution
 

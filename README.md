@@ -6,10 +6,6 @@
 
 StuntHog shows how coding agents complete a task. Give the agents a prompt and define the criteria for success. Choose the models, harnesses, and workspace. Each agent works in its own copy of the workspace. Open a session to see the agent’s tool calls and the judge’s decision for each criterion.
 
-## Demo
-
-![Evaluation results with agent sessions, criteria, duration, and cost](images/demo1.png)
-
 ## Install
 
 ### npm
@@ -69,33 +65,6 @@ bun run compile
 The `v*` tag workflow builds and publishes the five standalone executables to GitHub Releases. The tag must match the version in `package.json`. Each platform installs the same npm tarball and verifies the installed command and its removal before npm publishing. Stable versions use the `latest` npm tag, and prereleases use `next`.
 
 The development package stays private. Run `bun run package:npm <release-assets-directory>` to generate the publishable launcher, installer, and checksums in `release/npm`. The input directory must contain all five release archive checksum files. To inspect the package locally, run `npm pack ./release/npm --pack-destination release`.
-
-#### Connect the npm package to GitHub
-
-The release build sets `repository.url` to `git+https://github.com/PostHog/stunthog.git`. npm uses this value for the repository link on the package page. To authorize GitHub Actions to publish releases, configure a trusted publisher for `@posthog/stunthog`.
-
-1. Sign in to npm with an account that can manage `@posthog/stunthog`. If the package exists, go to step 2. To create it, use an account that can publish public packages in the `@posthog` scope. Run these commands in a new, empty directory outside this repository. Version `0.0.0` reserves the name under the `bootstrap` tag.
-
-   ```sh
-   npm login --registry=https://registry.npmjs.org
-   npm init -y
-   npm pkg set name=@posthog/stunthog version=0.0.0 repository.type=git repository.url=git+https://github.com/PostHog/stunthog.git
-   npm publish --registry=https://registry.npmjs.org --access public --tag bootstrap
-   ```
-
-2. On the npm package page, open **Settings → Trusted Publisher → GitHub Actions**. Enter these values and save the connection. [StuntHog on npm](https://www.npmjs.com/package/@posthog/stunthog) · [npm trusted publishing guide](https://docs.npmjs.com/trusted-publishers/)
-
-   | npm field | Value |
-   | --- | --- |
-   | Organization or user | `PostHog` |
-   | Repository | `stunthog` |
-   | Workflow filename | `release.yml` |
-   | Environment name | `npm` |
-   | Allowed actions | Allow direct publishing with `npm publish` |
-
-3. In GitHub, open **Settings → Environments → npm**. If deployment tag rules apply, allow tags that match `v*`. [Repository environments](https://github.com/PostHog/stunthog/settings/environments)
-4. Complete the first release through GitHub Actions within two days of saving the connection. Push a new `v*` tag on the release commit. The tag must match the version in `package.json`. [npm connection expiry](https://docs.npmjs.com/trusted-publishers/#trusted-publisher-configuration-expiry)
-5. After a stable release, run `npm view @posthog/stunthog@latest version repository.url`. Check that it prints the release version and `git+https://github.com/PostHog/stunthog.git`.
 
 ### Application data
 
