@@ -21,7 +21,7 @@ export function App() {
     return () => window.removeEventListener("hashchange", change);
   }, []);
 
-  const [page, id, action] = route.split("/");
+  const [page, id, action] = route.split("?")[0]?.split("/") ?? [];
   let content: ReactNode;
 
   if (page === "evals")

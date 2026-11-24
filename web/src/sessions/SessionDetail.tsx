@@ -126,7 +126,7 @@ export function SessionDetail({ id }: { id: string }) {
                 <TranscriptFilterIcon kind="settings" /> Configuration
               </TabsTrigger>
             </TabsList>
-            <TabsContent value="agent" className="session-log-view">
+            <TabsContent keepMounted value="agent" className="session-log-view">
               <LogPanel
                 key={jump.visit}
                 session={session}
@@ -138,7 +138,7 @@ export function SessionDetail({ id }: { id: string }) {
                 initialEntryId={jump.entryId}
               />
             </TabsContent>
-            <TabsContent value="judge" className="session-log-view">
+            <TabsContent keepMounted value="judge" className="session-log-view">
               <LogPanel
                 session={session}
                 active={active}

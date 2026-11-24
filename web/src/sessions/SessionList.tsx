@@ -8,7 +8,7 @@ import {
   TableHeader,
   TableRow,
 } from "@posthog/quill";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useApi } from "../api.js";
 import { Choice } from "../Choice.js";
 import {
@@ -37,7 +37,7 @@ export function SessionList() {
       {data ? (
         <>
           <Notice error={error} />
-          <SessionsTable sessions={data} />
+          <SessionsTable sessions={data} rememberFilters />
         </>
       ) : (
         <RequestState error={error} retry={refresh} />
@@ -46,10 +46,30 @@ export function SessionList() {
   );
 }
 
-export function SessionsTable({ sessions }: { sessions: Session[] }) {
-  const [model, setModel] = useState("");
-  const [status, setStatus] = useState("");
-  const [search, setSearch] = useState("");
+export function SessionsTable({
+  sessions,
+  rememberFilters = false,
+}: {
+  sessions: Session[];
+  rememberFilters?: boolean;
+}) {
+  const saved = new URLSearchParams(
+    rememberFilters ? location.hash.split("?")[1] : "",
+  );
+  const [model, setModel] = useState(() => saved.get("model") ?? "");
+  const [status, setStatus] = useState(() => saved.get("status") ?? "");
+  const [search, setSearch] = useState(() => saved.get("q") ?? "");
+  useEffect(() => {
+    if (!rememberFilters) return;
+    const query = new URLSearchParams();
+    for (const [key, value] of Object.entries({ model, status, q: search }))
+      if (value) query.set(key, value);
+    history.replaceState(
+      history.state,
+      "",
+      query.size ? `#sessions?${query}` : "#sessions",
+    );
+  }, [rememberFilters, model, status, search]);
   const models = [
     ...new Set(
       sessions.map((session) => `${session.harness}/${session.model}`),
