@@ -3,6 +3,7 @@ import { useRef, useState } from "react";
 import { useApi } from "../api.js";
 import { Choice } from "../Choice.js";
 import { Field, Notice } from "../components.js";
+import { ResponseComparison } from "../overrides/ResponseComparison.js";
 import { EmptyState, LoadingState, RequestState } from "../PageState.js";
 import type { Artifact } from "../types.js";
 import { FilePreview } from "./FilePreview.js";
@@ -17,6 +18,8 @@ export function FilesPanel({ id, active }: { id: string; active: boolean }) {
   const [text, setText] = useState<string>();
   const [failure, setFailure] = useState("");
   const [search, setSearch] = useState("");
+  const [comparison, setComparison] = useState<string>();
+  const [comparing, setComparing] = useState(false);
   const request = useRef(0);
   const files = data?.filter((file) => file.phase === phase) ?? [];
   const filtered = files.filter((file) =>
@@ -27,6 +30,8 @@ export function FilesPanel({ id, active }: { id: string; active: boolean }) {
     const version = ++request.current;
 
     setSelected(file);
+    setComparison(undefined);
+    setComparing(false);
     setText(undefined);
     setFailure("");
 
@@ -46,6 +51,27 @@ export function FilesPanel({ id, active }: { id: string; active: boolean }) {
     }
   }
 
+  const otherPhase = phase === "input" ? "output" : "input";
+  const other =
+    (phase === "input" || phase === "output") &&
+    data?.find(
+      (file) => file.phase === otherPhase && file.path === selected?.path,
+    );
+  async function compare(file: Artifact) {
+    const version = ++request.current;
+    setComparing(true);
+    setFailure("");
+    try {
+      const response = await fetch(`/api/sessions/${id}/files/${file.id}`);
+      if (!response.ok) throw new Error("Cannot compare the saved files.");
+      const content = await response.text();
+      if (version === request.current) setComparison(content);
+    } catch (error) {
+      if (version === request.current) setFailure(String(error));
+    } finally {
+      if (version === request.current) setComparing(false);
+    }
+  }
   return (
     <>
       <div className="toolbar">
@@ -57,7 +83,12 @@ export function FilesPanel({ id, active }: { id: string; active: boolean }) {
               setPhase(next);
               setSelected(undefined);
               setFailure("");
-              setSearch("");
+              setComparison(undefined);
+              setComparing(false);
+              const same = data?.find(
+                (file) => file.phase === next && file.path === selected?.path,
+              );
+              if (same) void read(same);
             }}
             options={[
               { value: "input", label: "Original input" },
@@ -117,6 +148,23 @@ export function FilesPanel({ id, active }: { id: string; active: boolean }) {
               <>
                 <div className="toolbar">
                   <h3>{selected.path}</h3>
+                  {other && text !== undefined && (
+                    <Button
+                      type="button"
+                      disabled={comparing}
+                      onClick={() =>
+                        comparison === undefined
+                          ? void compare(other)
+                          : setComparison(undefined)
+                      }
+                    >
+                      {comparing
+                        ? "Comparing…"
+                        : comparison === undefined
+                          ? "Compare snapshots"
+                          : "View file"}
+                    </Button>
+                  )}
                   <a
                     href={`/api/sessions/${id}/files/${selected.id}`}
                     download={selected.path.split("/").pop()}
@@ -127,6 +175,16 @@ export function FilesPanel({ id, active }: { id: string; active: boolean }) {
                 {!failure &&
                   (text === undefined ? (
                     <LoadingState label="Loading file…" />
+                  ) : comparison !== undefined ? (
+                    <>
+                      {comparison === text && <p>The file has no changes.</p>}
+                      <ResponseComparison
+                        beforeTitle="Original input"
+                        afterTitle="Final workspace"
+                        before={phase === "input" ? text : comparison}
+                        after={phase === "input" ? comparison : text}
+                      />
+                    </>
                   ) : (
                     <FilePreview
                       key={selected.id}
