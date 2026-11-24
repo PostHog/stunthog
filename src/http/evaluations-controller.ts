@@ -83,8 +83,19 @@ export class EvaluationsController {
   }
 
   @Post(":id/run")
-  run(@Param("id") id: string) {
-    return this.sessions.start(id);
+  run(@Param("id") id: string, @Body() input?: unknown) {
+    const selection = z
+      .object({
+        selection: z
+          .object({
+            revision: z.number().int().positive(),
+            models: z.array(z.number().int().nonnegative()).min(1),
+          })
+          .optional(),
+      })
+      .strict()
+      .parse(input ?? {});
+    return this.sessions.start(id, selection.selection);
   }
 
   @Post(":id/duplicate")
