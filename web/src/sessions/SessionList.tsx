@@ -20,7 +20,7 @@ import {
   number,
   Status,
 } from "../components.js";
-import { ModelReference } from "../models/ModelReference.js";
+import { ModelReference, useModelName } from "../models/ModelReference.js";
 import { EmptyState, RequestState } from "../PageState.js";
 import type { Session } from "../types.js";
 import { filterSessions, isActive } from "./session-filters.js";
@@ -55,7 +55,8 @@ export function SessionsTable({ sessions }: { sessions: Session[] }) {
       sessions.map((session) => `${session.harness}/${session.model}`),
     ),
   ];
-  const filtered = filterSessions(sessions, search, model, status);
+  const displayName = useModelName();
+  const filtered = filterSessions(sessions, search, model, status, displayName);
 
   function clear() {
     setModel("");
