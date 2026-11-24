@@ -47,6 +47,69 @@ export class SessionsController {
     return new Map(counts.map((row) => [row.sessionId, Number(row.total)]));
   }
 
+  @Get("history")
+  async history() {
+    // Search applies to every session, including rows beyond the first page.
+    const rows = await this.db.$queryRaw<
+      {
+        id: string;
+        harness: string;
+        model: string;
+        status: string;
+        title: string;
+        environment: string | null;
+        review: bigint;
+      }[]
+    >`
+      SELECT s.id,s.harness,s.model,s.status,e.title,json_extract(s.snapshot,'$.environment.title') AS environment,
+        CASE WHEN s.status IN ('queued','running','judging') THEN 0 WHEN s.status!='completed' OR
+          NOT EXISTS(SELECT 1 FROM SessionDecision d WHERE d.sessionId=s.id) OR
+          EXISTS(SELECT 1 FROM SessionDecision d WHERE d.sessionId=s.id AND d.passed=0) THEN 1 ELSE 0 END AS review
+      FROM Session s JOIN Eval e ON e.id=s.evalId ORDER BY s.createdAt DESC,s.id DESC`;
+    return rows.map((row) => ({ ...row, review: Boolean(row.review) }));
+  }
+
+  @Get("history/page")
+  async historyPage(@Query("ids") ids: string) {
+    const page = z
+      .array(z.string().uuid())
+      .min(1)
+      .max(25)
+      .parse(ids?.split(","));
+    const rows = await this.db.session.findMany({
+      where: { id: { in: page } },
+      select: {
+        id: true,
+        evalId: true,
+        model: true,
+        harness: true,
+        status: true,
+        createdAt: true,
+        durationMs: true,
+        costUsd: true,
+        verdict: true,
+        error: true,
+        eval: { select: { title: true } },
+        decisions: { select: { passed: true, criterionSnapshotId: true } },
+      },
+    });
+    const criteria = await this.db.$queryRaw<
+      { id: string; criteria: string }[]
+    >`SELECT id,CAST(json_extract(snapshot,'$.evaluation.criteria') AS TEXT) AS criteria FROM Session WHERE id IN (${Prisma.join(page)})`;
+    const byId = new Map(
+      criteria.map((row) => [row.id, JSON.parse(row.criteria ?? "[]")]),
+    );
+    const counts = await this.interceptedCalls(page);
+    const order = new Map(page.map((id, index) => [id, index]));
+    return rows
+      .sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0))
+      .map((row) => ({
+        ...row,
+        interceptedCalls: counts.get(row.id) ?? 0,
+        criteria: byId.get(row.id),
+      }));
+  }
+
   @Get(":id")
   async get(@Param("id") id: string) {
     const session = await this.db.session.findUnique({
