@@ -34,6 +34,7 @@ export function LogPanel({
   entries,
   error,
   initialCallId,
+  loadOlder,
 }: {
   session: Session;
   active: boolean;
@@ -41,6 +42,7 @@ export function LogPanel({
   entries: TranscriptEntry[];
   error: string;
   initialCallId?: string;
+  loadOlder?: (() => void) | undefined;
 }) {
   const [filter, setFilter] = useState<string>("focus");
   const [showScrollTop, setShowScrollTop] = useState(false);
@@ -236,6 +238,11 @@ export function LogPanel({
               )}
             </TranscriptRow>
           ))}
+          {loadOlder && (
+            <Button type="button" onClick={loadOlder}>
+              {error ? "Retry loading events" : "Load more trace events"}
+            </Button>
+          )}
           {visible.length > shown.length && (
             <Button
               type="button"
