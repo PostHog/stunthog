@@ -14,6 +14,7 @@ import {
 } from "./transcript/search.js";
 import { TranscriptFilterIcon } from "./transcript/TranscriptFilterIcon.js";
 import { TranscriptRow } from "./transcript/TranscriptRow.js";
+import { terminalText } from "./transcript/terminal-text.js";
 import type { TranscriptEntry } from "./transcript/types.js";
 
 const filters = [
@@ -31,7 +32,7 @@ export function LogPanel({
   session,
   active,
   phase,
-  entries,
+  entries: rawEntries,
   error,
   initialCallId,
 }: {
@@ -42,6 +43,13 @@ export function LogPanel({
   error: string;
   initialCallId?: string;
 }) {
+  const entries = useMemo(
+    () =>
+      rawEntries.map((entry) =>
+        entry.output ? { ...entry, output: terminalText(entry.output) } : entry,
+      ),
+    [rawEntries],
+  );
   const [filter, setFilter] = useState<string>("focus");
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [more, setMore] = useState(!!initialCallId);

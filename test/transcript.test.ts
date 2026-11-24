@@ -296,3 +296,12 @@ test("Codex shell traces can start a rule from a baseline and show the later edi
   assert.equal(trace[0]?.capture?.ruleId, "rule");
   assert.equal(trace[0]?.output, "changed");
 });
+
+import { terminalText } from "../web/src/sessions/transcript/terminal-text.js";
+
+test("terminal output drops color sequences and preserves text", () => {
+  assert.equal(
+    terminalText("\u001b[1;91munknown command\u001b[0m\n[0]"),
+    "unknown command\n[0]",
+  );
+});
