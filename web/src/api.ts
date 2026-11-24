@@ -34,7 +34,10 @@ export async function api<T>(path: string, options?: RequestInit): Promise<T> {
 }
 
 // Each screen owns its request. Abort previous requests when navigation changes the resource.
-export function useApi<T>(path: string, poll = false) {
+export function useApi<T>(
+  path: string,
+  poll: boolean | ((value: T) => boolean) = false,
+) {
   const [data, setData] = useState<T>();
   const [error, setError] = useState("");
   const [revision, setRevision] = useState(0);
@@ -63,6 +66,7 @@ export function useApi<T>(path: string, poll = false) {
           { signal: controller.signal, cache: "no-store" },
         );
         if (!controller.signal.aborted) {
+          if (typeof poll === "function" && !poll(value)) clearInterval(timer);
           setData(value);
           setError("");
         }
@@ -75,9 +79,8 @@ export function useApi<T>(path: string, poll = false) {
       }
     };
 
-    void load();
-
     const timer = poll ? setInterval(() => void load(), 2000) : undefined;
+    void load();
 
     return () => {
       controller.abort();

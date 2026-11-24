@@ -31,14 +31,35 @@ export function SessionDetail({ id }: { id: string }) {
     data: session,
     error,
     refresh,
-  } = useApi<Session>(`/sessions/${id}`, true);
+  } = useApi<Session>(`/sessions/${id}`, isActive);
+  if (!session) return <RequestState error={error} retry={refresh} />;
+  return (
+    <SessionView
+      key={session.id}
+      session={session}
+      error={error}
+      refresh={refresh}
+    />
+  );
+}
+function SessionView({
+  session,
+  error,
+  refresh,
+}: {
+  session: Session;
+  error: string;
+  refresh: () => void;
+}) {
+  const id = session.id;
   const [tab, setTab] = useState("agent");
   const [failure, setFailure] = useState("");
   const [cancelling, setCancelling] = useState(false);
   const [jump, setJump] = useState({ callId: "", entryId: "", visit: 0 });
   const active = !!session && isActive(session);
   const { events, error: traceError } = useSessionEvents(id, active);
-  const snapshot = session?.snapshot;
+  // A session retains the configuration captured at creation.
+  const [snapshot] = useState(session.snapshot);
   const agentEntries = useMemo(
     () =>
       snapshot
@@ -78,8 +99,6 @@ export function SessionDetail({ id }: { id: string }) {
       setCancelling(false);
     }
   }
-
-  if (!session) return <RequestState error={error} retry={refresh} />;
 
   return (
     <div className="session-detail">
