@@ -214,10 +214,7 @@
   flex-direction: column;
 }
 .transcript-scroll-top {
-  position: absolute;
-  inset-block-start: 8px;
-  inset-inline-end: 18px;
-  z-index: 1;
+  flex: 0 0 30px;
   width: 30px;
   height: 30px;
   min-height: 0;

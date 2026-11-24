@@ -140,6 +140,20 @@ export function LogPanel({
             value={search}
             onChange={(event) => setSearch(event.target.value)}
           />
+          {showScrollTop && (
+            <Button
+              type="button"
+              variant="outline"
+              className="transcript-scroll-top"
+              aria-label="Scroll to top"
+              onClick={() => {
+                container.current?.scrollTo({ top: 0 });
+                container.current?.focus({ preventScroll: true });
+              }}
+            >
+              <span aria-hidden="true">↑</span>
+            </Button>
+          )}
           {search && (
             <Button type="button" onClick={() => setSearch("")}>
               Clear search
@@ -149,20 +163,6 @@ export function LogPanel({
       </div>
       <Notice error={error} />
       <div className="transcript-body">
-        {showScrollTop && (
-          <Button
-            type="button"
-            variant="outline"
-            className="transcript-scroll-top"
-            aria-label="Scroll to top"
-            onClick={() => {
-              container.current?.scrollTo({ top: 0 });
-              container.current?.focus({ preventScroll: true });
-            }}
-          >
-            <span aria-hidden="true">↑</span>
-          </Button>
-        )}
         <section
           className="transcript-scroll"
           ref={container}
