@@ -249,7 +249,13 @@ export function LogPanel({
             (active && entries.length === 0 ? (
               <LoadingState label="Waiting for session activity…" />
             ) : (
-              <p className="empty">No entries match this filter and search.</p>
+              <p className="empty">
+                {entries.length
+                  ? "No entries match this filter and search."
+                  : phase === "agent" && session.error
+                    ? `The agent stopped before it recorded any activity. ${session.error}`
+                    : `The ${phase} recorded no activity.`}
+              </p>
             ))}
         </section>
       </div>
