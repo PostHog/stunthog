@@ -12,6 +12,13 @@ test("acceptance retains failed sessions and missing decisions", () => {
     passesSession({ status: "completed", decisions: [{ passed: true }] }),
     true,
   );
+  assert.deepEqual(
+    criterionDecisions(
+      [{ status: "failed", judgeResult: null, decisions: [] }],
+      "missing",
+    ),
+    [],
+  );
   assert.deepEqual(criterionDecisions([{ decisions: [] }], "missing"), [
     { passed: false },
   ]);
