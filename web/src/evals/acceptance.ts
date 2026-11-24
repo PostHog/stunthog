@@ -11,14 +11,25 @@ export function passesSession(session: {
   );
 }
 
-// A missing judgment remains in the denominator so failed sessions cannot raise acceptance.
+// A setup failure has no behavioral result. Other missing checks keep their existing denominator.
 export function criterionDecisions(
-  sessions: Pick<Session, "decisions">[],
+  sessions: (Pick<Session, "decisions"> &
+    Partial<Pick<Session, "status" | "judgeResult">>)[],
   id: string,
 ) {
-  return sessions.map((session) => ({
-    passed:
-      session.decisions.find((decision) => decision.criterionSnapshotId === id)
-        ?.passed ?? false,
-  }));
+  return sessions
+    .filter(
+      (session) =>
+        !(
+          session.status === "failed" &&
+          session.judgeResult === null &&
+          session.decisions.length === 0
+        ),
+    )
+    .map((session) => ({
+      passed:
+        session.decisions.find(
+          (decision) => decision.criterionSnapshotId === id,
+        )?.passed ?? false,
+    }));
 }
