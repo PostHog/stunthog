@@ -139,10 +139,19 @@ export function EvalDetail({ id }: { id: string }) {
             onValueChange={setBatch}
             options={[
               { value: "latest", label: "Latest run" },
-              ...batches.map((id) => ({
-                value: id,
-                label: `${new Date((allSessions ?? []).find((session) => session.batchId === id)?.createdAt ?? "").toLocaleString()} / ${id.slice(0, 8)}`,
-              })),
+              ...batches.map((id) => {
+                const run = (allSessions ?? []).filter(
+                  (session) => session.batchId === id,
+                );
+                const [first] = run;
+                if (!first) return { value: id, label: id };
+                const count =
+                  first.snapshot.evaluation.responseOverrides?.length ?? 0;
+                return {
+                  value: id,
+                  label: `${new Date(first.createdAt).toLocaleString()} · Revision ${first.snapshot.evaluation.revision} · ${count} ${count === 1 ? "override" : "overrides"} · ${run.length} ${run.length === 1 ? "session" : "sessions"}`,
+                };
+              }),
             ]}
           />
         </Field>
