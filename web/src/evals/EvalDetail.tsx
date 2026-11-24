@@ -225,9 +225,13 @@ export function EvalDetail({ id }: { id: string }) {
         />
       </div>
       <ResponseOverrideList
-        title="Current response overrides"
-        rules={evaluation.responseOverrides}
-        servers={resources?.mcps}
+        title={
+          sessions.length
+            ? "Overrides used in this run"
+            : "Current response overrides"
+        }
+        rules={definition.responseOverrides}
+        servers={sessions[0]?.snapshot.mcps ?? resources?.mcps}
       />
       {sessions.length > 0 && <UsageSummary sessions={sessions} />}
       <section className="section">
