@@ -13,7 +13,7 @@ export async function externalCommand(
     (rule) => rule.target.kind === "web",
   );
   const hookTimeout = input.responseOverrides?.some(
-    (r) => r.target.kind === "shell" && r.decision,
+    (r) => r.target.kind === "shell" && (r.decision || r.llmEdit),
   )
     ? 50
     : 10;

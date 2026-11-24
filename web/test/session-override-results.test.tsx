@@ -32,6 +32,7 @@ test("only a modified tool has response tabs, with its diff selected first", asy
           probability: 0.95,
         },
       ],
+      rationale: "Replaced the npm instruction with the Bun command.",
     },
   };
   try {
@@ -46,7 +47,9 @@ test("only a modified tool has response tabs, with its diff selected first", asy
     );
     assert.ok(document.querySelector(".diff-add"));
     assert.ok(screen.getByText(/95% match probability/));
-
+    assert.ok(
+      screen.getByText("Replaced the npm instruction with the Bun command."),
+    );
     fireEvent.click(screen.getByRole("tab", { name: "Original" }));
     assert.equal(
       (await screen.findByRole("tabpanel", { name: "Original" })).textContent,

@@ -40,11 +40,17 @@ export function ResponseOverrideList({
                       {i + 1}. {destination}
                     </strong>
                     <small>
-                      <code>{rule.find}</code>
-                      <span role="img" aria-label="replaced with">
-                        →
-                      </span>
-                      <code>{rule.replacement || "Delete match"}</code>
+                      {rule.llmEdit ? (
+                        <span>LLM edit · {rule.llmEdit.model}</span>
+                      ) : (
+                        <>
+                          <code>{rule.find}</code>
+                          <span role="img" aria-label="replaced with">
+                            →
+                          </span>
+                          <code>{rule.replacement || "Delete match"}</code>
+                        </>
+                      )}
                     </small>
                   </summary>
                   <dl>
@@ -54,31 +60,40 @@ export function ResponseOverrideList({
                         <dd>{rule.decision.prompt}</dd>
                       </>
                     )}
-                    <dt>
-                      {rule.mode === "regex"
-                        ? "Regular expression"
-                        : "Find text"}
-                    </dt>
-                    <dd>
-                      <code>{rule.find}</code>
-                    </dd>
-                    <dt>Replacement</dt>
-                    <dd>
-                      <code>{rule.replacement || "Delete match"}</code>
-                    </dd>
+                    {rule.llmEdit ? (
+                      <>
+                        <dt>Edit instruction</dt>
+                        <dd>{rule.llmEdit.prompt}</dd>
+                      </>
+                    ) : (
+                      <>
+                        <dt>
+                          {rule.mode === "regex"
+                            ? "Regular expression"
+                            : "Find text"}
+                        </dt>
+                        <dd>
+                          <code>{rule.find}</code>
+                        </dd>
+                        <dt>Replacement</dt>
+                        <dd>
+                          <code>{rule.replacement || "Delete match"}</code>
+                        </dd>
+                      </>
+                    )}
                     {!rule.decision && rule.inputContains && (
                       <>
                         <dt>Call input contains</dt>
-                        <dd>{!rule.decision && rule.inputContains}</dd>
+                        <dd>{rule.inputContains}</dd>
                       </>
                     )}
                     {!rule.decision && rule.outputContains && (
                       <>
                         <dt>Response contains</dt>
-                        <dd>{!rule.decision && rule.outputContains}</dd>
+                        <dd>{rule.outputContains}</dd>
                       </>
                     )}
-                    {rule.path && (
+                    {!rule.llmEdit && rule.path && (
                       <>
                         <dt>JSON field</dt>
                         <dd>

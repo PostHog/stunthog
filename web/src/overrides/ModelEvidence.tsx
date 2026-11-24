@@ -1,7 +1,7 @@
 import type { OverrideEvidence } from "../../../src/overrides/domain/response-override.js";
 
-export function ModelEvidence({ decisions }: OverrideEvidence) {
-  if (!decisions?.length) return null;
+export function ModelEvidence({ decisions, rationale }: OverrideEvidence) {
+  if (!decisions?.length && !rationale) return null;
   return (
     <dl className="override-evidence">
       {decisions?.map((decision) => (
@@ -19,6 +19,12 @@ export function ModelEvidence({ decisions }: OverrideEvidence) {
           </dd>
         </div>
       ))}
+      {rationale && (
+        <div>
+          <dt>Edit rationale</dt>
+          <dd>{rationale}</dd>
+        </div>
+      )}
     </dl>
   );
 }

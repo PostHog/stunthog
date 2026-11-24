@@ -55,7 +55,12 @@ export function deliverShellResponse(
     callId,
     "Shell",
     async (capture) => {
-      if (capture.ruleId || capture.error || capture.decisions?.length)
+      if (
+        capture.ruleId ||
+        capture.error ||
+        capture.rationale ||
+        capture.decisions?.length
+      )
         await record?.(capture);
     },
     rewrite,

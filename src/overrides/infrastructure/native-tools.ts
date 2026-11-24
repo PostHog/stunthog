@@ -31,6 +31,7 @@ const captureSchema = z.object({
   delivered: z.unknown().optional(),
   inputOmitted: z.boolean().optional(),
   decisions: z.array(decisionEvidenceSchema).max(40).optional(),
+  rationale: z.string().max(4096).optional(),
   ruleId: z.string().uuid().optional(),
   error: z.string().optional(),
 });
@@ -125,7 +126,7 @@ export async function prepareResponseTools(input: HarnessInput) {
     }
     if (web) await add();
     const processed = new Set<string>();
-    const modelRules = rules.some((rule) => rule.decision);
+    const modelRules = rules.some((rule) => rule.decision || rule.llmEdit);
     const pending = new Map<string, Promise<void>>();
     async function answer(name: string) {
       const path = join(directory, name);

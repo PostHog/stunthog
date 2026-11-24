@@ -344,7 +344,7 @@ test("direct edits to a structured MCP response keep the tool and field from the
   }
 });
 
-test("a model override previews only on request and saves the match condition", async () => {
+test("a model override previews only on request and saves both instructions", async () => {
   const old = globalThis.fetch;
   let requests = 0;
   let saved: ResponseRule | undefined;
@@ -355,6 +355,7 @@ test("a model override previews only on request and saves the match condition", 
       return Response.json({
         value: "Run setup next.",
         ruleId: rule.id,
+        rationale: "Added the setup step.",
         decisions: [{ ruleId: rule.id, model: "jev-test", probability: 0.98 }],
       });
     }) as typeof fetch;
@@ -383,17 +384,23 @@ test("a model override previews only on request and saves the match condition", 
     fireEvent.change(screen.getByLabelText("When should Jev match a call?"), {
       target: { value: "The command installs posthog-js." },
     });
-    editResponse("Run setup next.");
+    fireEvent.click(screen.getByRole("tab", { name: "LLM editing" }));
+    fireEvent.change(
+      screen.getByLabelText("How should the model edit the response?"),
+      { target: { value: "Add a setup step." } },
+    );
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 240));
     });
     assert.equal(requests, 0);
     fireEvent.click(screen.getByRole("button", { name: "Preview with model" }));
-    await screen.findByText(/98% match probability/);
+    await screen.findByText("Added the setup step.");
+    screen.getByText(/98% match probability/);
     fireEvent.click(screen.getByRole("button", { name: "Apply override" }));
     await waitFor(() =>
-      assert.equal(saved?.decision?.prompt, "The command installs posthog-js."),
+      assert.equal(saved?.llmEdit?.prompt, "Add a setup step."),
     );
+    assert.equal(saved?.decision?.prompt, "The command installs posthog-js.");
     assert.equal(requests, 1);
   } finally {
     cleanup();

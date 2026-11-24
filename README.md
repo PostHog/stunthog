@@ -103,9 +103,10 @@ In an agent session, expand a tool result and select **Intercept**. Choose how S
 
 - **Criteria-based** matches commands, URLs, or MCP tools using the conditions you select.
 - **Decision model** sends the scoped tool call and its response to TypeSafe. Jev matches when its probability exceeds 50%.
+- **Deterministic editing** replaces matching text. **LLM editing** sends the original response and your edit instruction to an OpenRouter model.
 - **Preview with model** runs the rule on the sample. Save the override to apply it to future sessions.
 
-Set `TYPESAFE_API_KEY` for Jev, or save the key in **API keys**. Expand **Result** in the trace to see the match probability and the response diff. If a provider request fails, the agent receives the original response.
+Set `TYPESAFE_API_KEY` for Jev and `OPENROUTER_API_KEY` for LLM editing, or save the keys in **API keys**. Expand **Result** in the trace to see the match probability, the edit rationale, and the response diff. If a provider request fails, the agent receives the original response.
 
 ## Harnesses
 

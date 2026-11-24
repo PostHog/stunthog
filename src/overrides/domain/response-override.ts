@@ -47,6 +47,13 @@ export const ruleSchema = z
       .object({ prompt: z.string().trim().min(1).max(4096) })
       .strict()
       .optional(),
+    llmEdit: z
+      .object({
+        prompt: z.string().trim().min(1).max(4096),
+        model: z.string().trim().min(1).max(160),
+      })
+      .strict()
+      .optional(),
   })
   .strict()
   .superRefine((rule, ctx) => {
@@ -55,14 +62,14 @@ export const ruleSchema = z
         code: "custom",
         message: "Enter a shell command to match.",
       });
-    if (!rule.find)
+    if (!rule.llmEdit && !rule.find)
       ctx.addIssue({ code: "custom", message: "Enter the text to replace." });
     if (rule.target.kind !== "mcp" && rule.path)
       ctx.addIssue({
         code: "custom",
         message: "Use a JSON field only with an MCP response.",
       });
-    if (rule.mode === "regex") {
+    if (!rule.llmEdit && rule.mode === "regex") {
       try {
         RE2JS.compile(rule.find);
       } catch {
@@ -94,6 +101,7 @@ export const decisionEvidenceSchema = z.object({
 });
 export interface OverrideEvidence {
   decisions?: z.infer<typeof decisionEvidenceSchema>[] | undefined;
+  rationale?: string | undefined;
 }
 export interface RewriteResult extends OverrideEvidence {
   value: unknown;
@@ -112,6 +120,10 @@ export interface ModelOperations {
     call: ToolCall,
     original: unknown,
   ): Promise<{ model: string; probability: number }>;
+  edit(
+    settings: NonNullable<ResponseRule["llmEdit"]>,
+    original: unknown,
+  ): Promise<{ value: unknown; rationale: string }>;
 }
 export interface ResponseCapture extends ToolCall, OverrideEvidence {
   callId: string;
@@ -232,6 +244,7 @@ export async function rewriteResponse(
 ): Promise<RewriteResult> {
   let commands: string[] | undefined;
   const evidence: OverrideEvidence = {};
+  let unmodifiedRationale: string | undefined;
   const text =
     typeof original === "string" ? original : JSON.stringify(original);
   for (const rule of rules) {
@@ -269,10 +282,11 @@ export async function rewriteResponse(
       if (rule.outputContains && !text?.includes(rule.outputContains)) continue;
     }
     try {
-      if (text === undefined || (!text && !rule.decision)) continue;
+      if (text === undefined || (!text && !rule.decision && !rule.llmEdit))
+        continue;
       if (text.length > limit)
         throw new Error("The response exceeds the edit limit.");
-      if (rule.decision && !models)
+      if ((rule.decision || rule.llmEdit) && !models)
         throw new Error("The override model is unavailable.");
       if (rule.decision && models) {
         const decision = await models.decide(
@@ -288,7 +302,11 @@ export async function rewriteResponse(
         });
         if (decision.probability <= 0.5) continue;
       }
-      const value = editResult(rule, original);
+      const edit =
+        rule.llmEdit && models
+          ? await models.edit(rule.llmEdit, original)
+          : undefined;
+      const value = edit ? edit.value : editResult(rule, original);
       const serialized =
         typeof value === "string" ? value : JSON.stringify(value);
       if (serialized.length > limit)
@@ -298,7 +316,9 @@ export async function rewriteResponse(
           ...evidence,
           value,
           ruleId: rule.id,
+          ...(edit && { rationale: edit.rationale }),
         };
+      if (edit) unmodifiedRationale = edit.rationale;
     } catch (error) {
       return {
         ...evidence,
@@ -311,5 +331,6 @@ export async function rewriteResponse(
   return {
     ...evidence,
     value: original,
+    ...(unmodifiedRationale && { rationale: unmodifiedRationale }),
   };
 }
