@@ -409,6 +409,16 @@ async function verifyApplicationPersistence() {
         [drift.callId, "c1", "c2"],
       );
       const listed = await controller.list(evaluation.id);
+      const edited = await controller.events(s.id, "0", "intercepts");
+      assert.ok(edited.length > 0);
+      assert.ok(
+        edited.every(
+          (row) => row.phase === "response" && typeof row.event === "object",
+        ),
+      );
+      assert.doesNotThrow(() => JSON.stringify(edited));
+      const judgeEvents = await controller.events(s.id, "0", "judge");
+      assert.ok(judgeEvents.every((row) => row.phase === "judge"));
       for (const item of saved) {
         assert.equal(
           listed.find((row) => row.id === item.id)?.interceptedCalls,
