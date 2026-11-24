@@ -56,7 +56,9 @@ function Editor({
   initial?: EvaluationData;
   defaults?: EvaluationDefaultsData;
 }) {
-  const draftKey = initial ? `${initial.id}/${initial.revision}` : "new";
+  const draftKey = initial
+    ? `${initial.id}/${initial.revision}`
+    : `new/${JSON.stringify(defaults)}`;
   const [value, update] = useState<EvalDraft>(
     () =>
       drafts.get(draftKey) ??
