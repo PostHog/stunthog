@@ -23,13 +23,12 @@ export class ProviderCreditsService {
   ) {}
 
   async get(): Promise<ProviderCredit[]> {
-    const [openRouter, openAi, anthropic] = await Promise.all([
+    return Promise.all([
       this.openRouter(),
       this.unsupported("openai"),
       this.unsupported("anthropic"),
+      this.unsupported("typesafe"),
     ]);
-
-    return [openRouter, openAi, anthropic];
   }
 
   private async openRouter(): Promise<ProviderCredit> {
@@ -70,7 +69,7 @@ export class ProviderCreditsService {
   }
 
   private async unsupported(
-    provider: "openai" | "anthropic",
+    provider: "openai" | "anthropic" | "typesafe",
   ): Promise<ProviderCredit> {
     const configured = Boolean(await this.keys.read(provider));
 
@@ -78,9 +77,14 @@ export class ProviderCreditsService {
       provider,
       balanceUsd: null,
       status: configured ? "unsupported" : "not_configured",
-      detail: configured
-        ? "This provider does not expose remaining credit to a standard API key."
-        : `Add an ${provider === "openai" ? "OpenAI" : "Anthropic"} API key to run sessions.`,
+      detail:
+        provider === "typesafe"
+          ? configured
+            ? "TypeSafe does not publish a credit balance through its API."
+            : "Add a TypeSafe API key to use Jev."
+          : configured
+            ? "This provider does not expose remaining credit to a standard API key."
+            : `Add an ${provider === "openai" ? "OpenAI" : "Anthropic"} API key to run sessions.`,
     };
   }
 }

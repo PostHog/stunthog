@@ -3,7 +3,7 @@ import stuntHedgehog from "../../images/posthog-hedgehog-evel.png";
 import { useApi } from "./api.js";
 
 type ProviderCredit = {
-  provider: "openrouter" | "openai" | "anthropic";
+  provider: "openrouter" | "openai" | "anthropic" | "typesafe";
   balanceUsd: number | null;
   status: "available" | "not_configured" | "unsupported" | "unavailable";
   detail: string;
@@ -13,6 +13,7 @@ const providerNames = {
   openrouter: "OpenRouter",
   openai: "OpenAI",
   anthropic: "Anthropic",
+  typesafe: "TypeSafe",
 };
 
 export const navigationGroups: { title: string; links: [string, string][] }[] =

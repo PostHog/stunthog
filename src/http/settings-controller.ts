@@ -16,7 +16,12 @@ import { HarnessRegistry } from "../harnesses/domain/harness-registry.js";
 import { SessionQueue } from "../sessions/application/session-queue.js";
 import { SettingsService } from "../settings/application/settings-service.js";
 
-const providerSchema = z.enum(["openrouter", "openai", "anthropic"]);
+const providerSchema = z.enum([
+  "openrouter",
+  "openai",
+  "anthropic",
+  "typesafe",
+]);
 
 @Controller("api")
 export class SettingsController {

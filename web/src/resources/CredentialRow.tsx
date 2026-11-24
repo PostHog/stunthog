@@ -38,7 +38,7 @@ export function CredentialRow({
           ) : environment ? (
             <code>{provider?.variable}</code>
           ) : (
-            "Add a key to use these sessions."
+            "Add an API key to use this provider."
           )}
         </p>
       </div>

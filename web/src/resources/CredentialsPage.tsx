@@ -31,8 +31,7 @@ export function CredentialsPage() {
         />
       </PageTitle>
       <p className="description">
-        Add a key for the harness you want to use. You do not need keys for
-        every provider.
+        Add keys for the providers you use in sessions and response overrides.
       </p>
       <Feedback message={message} />
       {data ? (
@@ -43,7 +42,7 @@ export function CredentialsPage() {
       <div className="credentials">
         {data && (
           <div className="credentials-heading" aria-hidden="true">
-            <span>Provider / harness</span>
+            <span>Provider / use</span>
             <span>Key source</span>
             <span>Actions</span>
           </div>

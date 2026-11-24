@@ -58,8 +58,8 @@ export function CredentialForm({
       <form onSubmit={submit}>
         <p className="muted">
           {remove
-            ? `Remove the saved ${name} key from this app? Future ${provider?.harnesses ?? name} sessions will use the environment key if one is set. Otherwise, they will need a new key.`
-            : `Used by ${provider?.harnesses ?? name}. This change applies to future sessions.`}
+            ? `Remove the saved ${name} key from this app? StuntHog will use the environment key if you set one.`
+            : `StuntHog uses this key for ${provider?.harnesses ?? name}.`}
         </p>
         {!remove && (
           <>
