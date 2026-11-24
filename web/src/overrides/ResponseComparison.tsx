@@ -77,7 +77,11 @@ export function ResponseComparison({
   before,
   after,
   onEdit,
+  beforeTitle = "Original response",
+  afterTitle = "Response for the agent",
 }: {
+  beforeTitle?: string;
+  afterTitle?: string;
   before: string;
   after: string;
   onEdit?: ((text: string) => void) | undefined;
@@ -101,7 +105,7 @@ export function ResponseComparison({
   return (
     <div className="response-comparison">
       <ResponsePane
-        title="Original response"
+        title={beforeTitle}
         text={left}
         parts={parts}
         side="before"
@@ -110,7 +114,7 @@ export function ResponseComparison({
         →
       </span>
       <ResponsePane
-        title="Response for the agent"
+        title={afterTitle}
         text={right}
         parts={parts}
         side="after"
