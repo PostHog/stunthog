@@ -23,7 +23,7 @@ import {
 import { ModelReference } from "../models/ModelReference.js";
 import { EmptyState, RequestState } from "../PageState.js";
 import type { Session } from "../types.js";
-import { filterSessions } from "./session-filters.js";
+import { filterSessions, isActive } from "./session-filters.js";
 
 export function SessionList() {
   const { data, error, refresh } = useApi<Session[]>("/sessions", true);
@@ -162,11 +162,17 @@ export function SessionsTable({ sessions }: { sessions: Session[] }) {
                   </TableCell>
                   <TableCell className="verdict-preview">
                     <p className="cell-description">
-                      {session.error ?? session.verdict ?? "Awaiting judgment"}
+                      {session.verdict ??
+                        (isActive(session)
+                          ? "Awaiting judgment"
+                          : "No judgment")}
                     </p>
                   </TableCell>
                   <TableCell>
                     <Status value={session.status} />
+                    {session.error && (
+                      <p className="cell-description">{session.error}</p>
+                    )}
                   </TableCell>
                   <TableCell>{number(session.interceptedCalls)}</TableCell>
                   <TableCell>{duration(session.durationMs)}</TableCell>
