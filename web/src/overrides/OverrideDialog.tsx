@@ -17,6 +17,7 @@ import {
 import type {
   ResponseCapture,
   ResponseRule,
+  RewriteResult,
   Target,
 } from "../../../src/overrides/domain/response-override.js";
 import {
@@ -32,6 +33,8 @@ import { Field, Notice } from "../components.js";
 import { Dialog } from "../Dialog.js";
 import { ResourceDialog } from "../evals/ResourceDialog.js";
 import { TranscriptFilterIcon } from "../sessions/transcript/TranscriptFilterIcon.js";
+import { ModelEvidence } from "./ModelEvidence.js";
+import { OverrideEngines } from "./OverrideEngines.js";
 import { callOrigin, PreviousCalls } from "./PreviousCalls.js";
 import { RegexInput } from "./RegexInput.js";
 import { ResponseComparison } from "./ResponseComparison.js";
@@ -205,15 +208,14 @@ export function OverrideDialog({
     if (/[\r\n]/.test(field.text.replaceAll(newline, ""))) return;
     return { ...field, newline };
   }, [picked]);
+  const usesModel = !!rule.decision;
   const direct = method === "direct" && !!passage;
   const [example, setExample] = useState("");
   const [args, setArgs] = useState("");
   const [newServer, setNewServer] = useState(false);
-  const [result, setResult] = useState<{
-    value: unknown;
-    error?: string;
-    ruleId?: string;
-  }>();
+  const [result, setResult] = useState<RewriteResult>();
+  const previewRequest = useRef<AbortController | null>(null);
+  const [checking, setChecking] = useState(false);
   const [error, setError] = useState("");
   const [saveError, setSaveError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -238,12 +240,15 @@ export function OverrideDialog({
   const sameText = rule.mode === "text" && rule.find === rule.replacement;
   const canApply =
     !busy &&
+    (!rule.decision || Boolean(rule.decision.prompt.trim())) &&
     !editIssue &&
     !!rule.find &&
     !sameText &&
     targetChosen &&
     validServer &&
-    (source.kind !== "shell" || Boolean(source.command.trim()));
+    (source.kind !== "shell" ||
+      !!rule.decision ||
+      Boolean(source.command.trim()));
   const hasSample = Boolean(picked) || Boolean(example);
   const preview = useMemo(() => {
     try {
@@ -254,7 +259,11 @@ export function OverrideDialog({
           : source.kind === "web" && source.url
             ? { url: source.url }
             : {});
-      const sampleTarget = picked?.target ?? source;
+      const sampleTarget =
+        picked?.target ??
+        (source.kind === "shell" && typeof input?.command === "string"
+          ? { ...source, command: input.command }
+          : source);
       let original: unknown = picked ? picked.output : example;
       if (sampleTarget.kind === "mcp") {
         if (typeof original === "string") {
@@ -298,9 +307,31 @@ export function OverrideDialog({
       };
     }
   }, [rule, source, picked, args, example]);
+  async function previewWithModel() {
+    previewRequest.current?.abort();
+    const controller = new AbortController();
+    previewRequest.current = controller;
+    setChecking(true);
+    setResult(undefined);
+    setError("");
+    try {
+      if (preview.issue) throw new Error(preview.issue);
+      const value = await api<RewriteResult>(
+        "/evals/response-overrides/preview",
+        { method: "POST", body: preview.body, signal: controller.signal },
+      );
+      if (!controller.signal.aborted) setResult(value);
+    } catch (err) {
+      if (!controller.signal.aborted) setError(String(err));
+    } finally {
+      if (!controller.signal.aborted) setChecking(false);
+    }
+  }
   useEffect(() => {
+    setChecking(false);
     setError("");
     setResult(undefined);
+    if (usesModel) return () => previewRequest.current?.abort();
     if (!rule.find || !hasSample || !validServer || sameText) return;
     if (preview.issue) {
       setError(preview.issue);
@@ -325,7 +356,7 @@ export function OverrideDialog({
       clearTimeout(timer);
       controller.abort();
     };
-  }, [preview, rule.find, hasSample, validServer, sameText]);
+  }, [preview, rule.find, hasSample, validServer, sameText, usesModel]);
   function choose(call: ToolExample) {
     setPicked({
       title: call.tool || call.name,
@@ -365,13 +396,15 @@ export function OverrideDialog({
     setSaveError("");
     try {
       if (preview.issue) throw new Error(preview.issue);
-      const check = await api<{ error?: string; ruleId?: string }>(
-        "/evals/response-overrides/preview",
-        { method: "POST", body: preview.body },
-      );
-      if (check.error) throw new Error(check.error);
-      if (inline && !check.ruleId)
-        throw new Error("Edit text that matches this response.");
+      if (!usesModel) {
+        const check = await api<{ error?: string; ruleId?: string }>(
+          "/evals/response-overrides/preview",
+          { method: "POST", body: preview.body },
+        );
+        if (check.error) throw new Error(check.error);
+        if (inline && !check.ruleId)
+          throw new Error("Edit text that matches this response.");
+      }
       await onApply(rule);
       onClose();
     } catch (e) {
@@ -404,7 +437,9 @@ export function OverrideDialog({
     : source.kind === "web"
       ? (source.url ?? "All web fetches")
       : source.kind === "shell"
-        ? source.command || "Shell command"
+        ? rule.decision
+          ? "Shell calls"
+          : source.command || "Shell command"
         : [
             servers.find((s) => s.id === source.serverId)?.title ??
               "Choose an MCP server",
@@ -440,17 +475,25 @@ export function OverrideDialog({
     : editIssue ||
       error ||
       result?.error ||
-      (!rule.find || sameText
-        ? direct
-          ? "Edit the response for the agent."
-          : "Enter the text to replace."
-        : !validServer
-          ? "Select an MCP server."
-          : result?.ruleId
-            ? "The rule changes this sample."
-            : result
-              ? "This rule leaves the sample unchanged."
-              : "Checking this edit…");
+      (usesModel
+        ? checking
+          ? "Checking the sample…"
+          : result
+            ? result.ruleId
+              ? "The rule changes this sample."
+              : "The rule leaves this sample unchanged."
+            : ""
+        : !rule.find || sameText
+          ? direct
+            ? "Edit the response for the agent."
+            : "Enter the text to replace."
+          : !validServer
+            ? "Select an MCP server."
+            : result?.ruleId
+              ? "The rule changes this sample."
+              : result
+                ? "This rule leaves the sample unchanged."
+                : "Checking this edit…");
   const footer = (
     <>
       <span className="override-footer-start muted">
@@ -528,7 +571,14 @@ export function OverrideDialog({
         </details>
       )}
       <section className="override-workspace">
-        {inline && shellScope}
+        <OverrideEngines
+          decision={rule.decision}
+          change={(patch) => {
+            setEditIssue("");
+            change(patch);
+          }}
+        />
+        {inline && !rule.decision && shellScope}
         <div className="override-workspace-heading">
           {!inline && (
             <details
@@ -594,25 +644,27 @@ export function OverrideDialog({
                     </p>
                   </>
                 ) : source.kind === "shell" ? (
-                  (shellScope ?? (
-                    <Field
-                      label={
-                        source.match === "batch"
-                          ? "Full command line"
-                          : "Command to match"
-                      }
-                    >
-                      <Textarea
-                        value={source.command}
-                        placeholder="npm install posthog-js"
-                        onChange={(e) =>
-                          change({
-                            target: { ...source, command: e.target.value },
-                          })
+                  rule.decision ? null : (
+                    (shellScope ?? (
+                      <Field
+                        label={
+                          source.match === "batch"
+                            ? "Full command line"
+                            : "Command to match"
                         }
-                      />
-                    </Field>
-                  ))
+                      >
+                        <Textarea
+                          value={source.command}
+                          placeholder="npm install posthog-js"
+                          onChange={(e) =>
+                            change({
+                              target: { ...source, command: e.target.value },
+                            })
+                          }
+                        />
+                      </Field>
+                    ))
+                  )
                 ) : (
                   <>
                     <div className="form-grid">
@@ -663,45 +715,47 @@ export function OverrideDialog({
                       )}
                   </>
                 )}
-                <details
-                  className="override-conditions"
-                  open={
-                    initial?.inputContains ||
-                    initial?.outputContains ||
-                    initial?.path
-                      ? true
-                      : undefined
-                  }
-                >
-                  <summary>Additional match conditions</summary>
-                  <Field label="Only when the call input contains">
-                    <Input
-                      placeholder="A URL, file name, or search term"
-                      value={rule.inputContains}
-                      onChange={(e) =>
-                        change({ inputContains: e.target.value })
-                      }
-                    />
-                  </Field>
-                  <Field label="Only when the response contains">
-                    <Input
-                      placeholder="Text that identifies the response"
-                      value={rule.outputContains}
-                      onChange={(e) =>
-                        change({ outputContains: e.target.value })
-                      }
-                    />
-                  </Field>
-                  {source.kind === "mcp" && (
-                    <Field label="Edit one field in the structured response (JSON Pointer)">
+                {!rule.decision && (
+                  <details
+                    className="override-conditions"
+                    open={
+                      initial?.inputContains ||
+                      initial?.outputContains ||
+                      initial?.path
+                        ? true
+                        : undefined
+                    }
+                  >
+                    <summary>Additional match conditions</summary>
+                    <Field label="Only when the call input contains">
                       <Input
-                        placeholder="/instructions/setup"
-                        value={rule.path}
-                        onChange={(e) => change({ path: e.target.value })}
+                        placeholder="A URL, file name, or search term"
+                        value={rule.inputContains}
+                        onChange={(e) =>
+                          change({ inputContains: e.target.value })
+                        }
                       />
                     </Field>
-                  )}
-                </details>
+                    <Field label="Only when the response contains">
+                      <Input
+                        placeholder="Text that identifies the response"
+                        value={rule.outputContains}
+                        onChange={(e) =>
+                          change({ outputContains: e.target.value })
+                        }
+                      />
+                    </Field>
+                    {source.kind === "mcp" && (
+                      <Field label="Edit one field in the structured response (JSON Pointer)">
+                        <Input
+                          placeholder="/instructions/setup"
+                          value={rule.path}
+                          onChange={(e) => change({ path: e.target.value })}
+                        />
+                      </Field>
+                    )}
+                  </details>
+                )}
               </div>
             </details>
           )}
@@ -781,17 +835,34 @@ export function OverrideDialog({
                 onChange={(e) => setExample(e.target.value)}
               />
             </Field>
-            {rule.inputContains && (
+            {(rule.inputContains || rule.decision) && (
               <Field label="Sample call input">
                 <Input
                   value={args}
-                  placeholder='{"query":"Next.js"}'
+                  placeholder={
+                    source.kind === "shell"
+                      ? '{"command":"npm install lodash posthog-js"}'
+                      : source.kind === "web"
+                        ? '{"url":"https://posthog.com/docs"}'
+                        : '{"query":"Next.js"}'
+                  }
                   onChange={(e) => setArgs(e.target.value)}
                 />
               </Field>
             )}
           </div>
         )}
+        {usesModel && hasSample && (
+          <Button
+            type="button"
+            variant="outline"
+            disabled={checking || !canApply}
+            onClick={previewWithModel}
+          >
+            {checking ? "Checking sample…" : "Preview with model"}
+          </Button>
+        )}
+        {result && <ModelEvidence {...result} />}
         {hasSample && (
           <ResponseComparison
             before={direct ? passage.text : preview.original}

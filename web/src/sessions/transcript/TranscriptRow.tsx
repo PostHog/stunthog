@@ -10,6 +10,7 @@ import {
 } from "@posthog/quill";
 import type { ReactNode } from "react";
 import type { ResponseCapture } from "../../../../src/overrides/domain/response-override.js";
+import { ModelEvidence } from "../../overrides/ModelEvidence.js";
 import { ResponseComparison } from "../../overrides/ResponseComparison.js";
 import { displayResponse } from "../../overrides/response-text.js";
 import { StatusIcon } from "../../status/StatusIcon.js";
@@ -128,6 +129,7 @@ export function TranscriptRow({
                 {(entry.output ?? "").replaceAll(/\s+/g, " ").slice(0, 180)}
               </CollapsibleTrigger>
               <CollapsibleContent>
+                {capture && <ModelEvidence {...capture} />}
                 {modified ? (
                   <Tabs defaultValue="diff" className="trace-result-tabs">
                     <TabsList aria-label="Tool response">

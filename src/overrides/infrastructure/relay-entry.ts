@@ -1,6 +1,6 @@
 // This Node entry point runs inside the same runtime as the native harness.
 import { randomUUID } from "node:crypto";
-import { readFile, rename, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
@@ -15,12 +15,14 @@ import {
   type ToolCall,
 } from "../domain/response-override.js";
 import { deliverResponse, deliverShellResponse } from "./deliver.js";
+import { publish, relayRewrite } from "./model-exchange.js";
 import { fetchPage } from "./read-page.js";
 
 function isCredentialVariable(name: string): boolean {
   return (
     /^(?:STUNTHOG|AGENT_EVAL)_MCP_TOKEN_/.test(name) ||
     [
+      "TYPESAFE_API_KEY",
       "ANTHROPIC_API_KEY",
       "OPENAI_API_KEY",
       "OPENROUTER_API_KEY",
@@ -34,12 +36,10 @@ async function writeCapture(path: string, capture: ResponseCapture) {
     .filter(([key, value]) => !!value && isCredentialVariable(key))
     .map(([, value]) => value as string);
   const destination = join(dirname(path), randomUUID());
-  await writeFile(
-    `${destination}.partial`,
+  await publish(
+    `${destination}.response`,
     JSON.stringify(redactEvent(capture, secrets)),
-    { mode: 0o600, flag: "wx" },
   );
-  await rename(`${destination}.partial`, `${destination}.response`);
 }
 
 const nativeCall = z.object({
@@ -55,8 +55,13 @@ async function applyShell(
   output: string,
 ) {
   const rules = rulesSchema.parse(JSON.parse(await readFile(path, "utf8")));
-  return deliverShellResponse(rules, command, output, id, (capture) =>
-    writeCapture(path, capture),
+  return deliverShellResponse(
+    rules,
+    command,
+    output,
+    id,
+    (capture) => writeCapture(path, capture),
+    relayRewrite(dirname(path)),
   );
 }
 
@@ -99,7 +104,7 @@ export async function runShellHook(path: string, harness: "claude" | "codex") {
         : typeof fields.output === "string"
           ? fields.output
           : undefined;
-  if (!text) return;
+  if (text === undefined) return;
   const value = await applyShell(path, tool_use_id, tool_input.command, text);
   if (value === text) return;
   process.stdout.write(
@@ -226,6 +231,7 @@ async function main() {
           id,
           record,
           "StuntHog web fetch",
+          relayRewrite(dirname(path)),
         );
         return {
           content: [{ type: "text", text }],
@@ -304,6 +310,7 @@ async function main() {
             id,
             "MCP relay",
             record,
+            relayRewrite(dirname(path)),
           );
           await downstream.send({
             ...message,

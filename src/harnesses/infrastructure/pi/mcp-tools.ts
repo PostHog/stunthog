@@ -90,6 +90,7 @@ export async function connectMcpTools(request: HarnessRequest) {
                       id,
                       "Pi MCP",
                       request.onToolResponse,
+                      request.rewrite,
                     )
                   : result;
               return {
@@ -114,10 +115,12 @@ export async function connectMcpTools(request: HarnessRequest) {
 }
 
 async function stdioTransport(server: McpServer, request: HarnessRequest) {
+  const env = request.runtime?.kind === "docker" ? {} : { ...process.env };
+  delete env.TYPESAFE_API_KEY;
   const localCommand: ProcessCommand = {
     binary: server.command,
     args: server.arguments,
-    env: request.runtime?.kind === "docker" ? {} : process.env,
+    env,
   };
   const command = request.runtime
     ? await request.runtime.process(localCommand, request.workspace)

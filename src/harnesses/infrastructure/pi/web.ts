@@ -32,6 +32,8 @@ export function webTool(
             request?.responseOverrides,
             id,
             request?.onToolResponse,
+            undefined,
+            request?.rewrite,
           ),
         },
       ],

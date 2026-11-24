@@ -5,7 +5,7 @@ import { Inject, Injectable, Optional } from "@nestjs/common";
 import { AnalyticsService } from "../../analytics/analytics-service.js";
 import { observedHarness } from "../../analytics/observed-harness.js";
 import { McpAuthorization } from "../../catalog/application/mcp-authorization.js";
-import { CredentialStore } from "../../credentials/provider.js";
+import { CredentialStore, providers } from "../../credentials/provider.js";
 import type { ModelSettingsData } from "../../evaluations/domain/model-settings.js";
 import type {
   HarnessInput,
@@ -13,6 +13,7 @@ import type {
 } from "../../harnesses/domain/harness.js";
 import { HarnessRegistry } from "../../harnesses/domain/harness-registry.js";
 import { redactEvent } from "../../harnesses/domain/redact-secrets.js";
+import { ModelRewriter } from "../../overrides/application/model-rewriter.js";
 import type { ResponseCapture } from "../../overrides/domain/response-override.js";
 import type { ExecutionSnapshot } from "../domain/execution-snapshot.js";
 import { judgingPrompt } from "../domain/judging-prompt.js";
@@ -37,6 +38,7 @@ export class SessionWorker {
     @Optional()
     @Inject(McpAuthorization)
     private readonly mcpAuthorization?: McpAuthorization,
+    @Inject(ModelRewriter) private readonly rewriter?: ModelRewriter,
   ) {}
 
   async execute(
@@ -289,6 +291,7 @@ export class SessionWorker {
     );
     const secrets = [
       apiKey,
+      ...Object.values(providers).map((name) => process.env[name]),
       ...mcps.map((server) => server.accessToken),
     ].filter((secret): secret is string => Boolean(secret));
 
@@ -329,6 +332,9 @@ export class SessionWorker {
       mcps,
       ...(phase === "agent" && {
         responseOverrides: snapshot.evaluation.responseOverrides ?? [],
+        ...(this.rewriter && {
+          rewrite: this.rewriter.forSession(secrets, signal),
+        }),
         onToolResponse: (capture: ResponseCapture) =>
           this.sessions.event(
             session.id,

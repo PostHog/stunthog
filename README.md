@@ -97,6 +97,16 @@ The eval page compares acceptance by model and criterion. Select a previous batc
 
 The **Sessions** page lists executions. Open a session to view its prompt, persona, harness, model, usage, duration, logs, input files, output files, runtime files, and judge feedback. Active pages refresh automatically. You can cancel an active or queued session.
 
+## Response overrides
+
+In an agent session, expand a tool result and select **Intercept**. Choose how StuntHog matches calls and edits their responses.
+
+- **Criteria-based** matches commands, URLs, or MCP tools using the conditions you select.
+- **Decision model** sends the scoped tool call and its response to TypeSafe. Jev matches when its probability exceeds 50%.
+- **Preview with model** runs the rule on the sample. Save the override to apply it to future sessions.
+
+Set `TYPESAFE_API_KEY` for Jev, or save the key in **API keys**. Expand **Result** in the trace to see the match probability and the response diff. If a provider request fails, the agent receives the original response.
+
 ## Harnesses
 
 | Harness | Model catalog | Key | Requirement |

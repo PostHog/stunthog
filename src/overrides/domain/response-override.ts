@@ -18,7 +18,7 @@ export const targetSchema = z.discriminatedUnion("kind", [
     .object({
       kind: z.literal("shell"),
       match: z.enum(["command", "batch"]),
-      command: z.string().trim().min(1).max(64_000),
+      command: z.string().trim().max(64_000),
     })
     .strict(),
   z
@@ -33,18 +33,30 @@ export const ruleSchema = z
   .object({
     id: z.string().uuid(),
     target: targetSchema,
-    inputContains: z.string().max(1024),
-    outputContains: z.string().max(2048),
+    inputContains: z.string().max(1024).default(""),
+    outputContains: z.string().max(2048).default(""),
     path: z
       .string()
       .max(maxPathLength)
-      .regex(/^(?:$|\/)/),
-    mode: z.enum(["text", "regex"]),
-    find: z.string().min(1).max(maxFindLength),
-    replacement: z.string().max(maxReplacementLength),
+      .regex(/^(?:$|\/)/)
+      .default(""),
+    mode: z.enum(["text", "regex"]).default("text"),
+    find: z.string().max(maxFindLength).default(""),
+    replacement: z.string().max(maxReplacementLength).default(""),
+    decision: z
+      .object({ prompt: z.string().trim().min(1).max(4096) })
+      .strict()
+      .optional(),
   })
   .strict()
   .superRefine((rule, ctx) => {
+    if (!rule.decision && rule.target.kind === "shell" && !rule.target.command)
+      ctx.addIssue({
+        code: "custom",
+        message: "Enter a shell command to match.",
+      });
+    if (!rule.find)
+      ctx.addIssue({ code: "custom", message: "Enter the text to replace." });
     if (rule.target.kind !== "mcp" && rule.path)
       ctx.addIssue({
         code: "custom",
@@ -74,7 +86,34 @@ export interface ToolCall {
   target: Target;
   args: Record<string, unknown>;
 }
-export interface ResponseCapture extends ToolCall {
+export const decisionEvidenceSchema = z.object({
+  ruleId: z.string().uuid(),
+  model: z.string().min(1).max(160),
+  condition: z.string().max(4096),
+  probability: z.number().min(0).max(1),
+});
+export interface OverrideEvidence {
+  decisions?: z.infer<typeof decisionEvidenceSchema>[] | undefined;
+}
+export interface RewriteResult extends OverrideEvidence {
+  value: unknown;
+  ruleId?: string;
+  error?: string;
+}
+export type Rewrite = (
+  rules: ResponseRule[],
+  call: ToolCall,
+  original: unknown,
+  signal?: AbortSignal,
+) => Promise<RewriteResult>;
+export interface ModelOperations {
+  decide(
+    prompt: string,
+    call: ToolCall,
+    original: unknown,
+  ): Promise<{ model: string; probability: number }>;
+}
+export interface ResponseCapture extends ToolCall, OverrideEvidence {
   callId: string;
   route: string;
   original: unknown;
@@ -184,32 +223,20 @@ function editResult(rule: ResponseRule, original: unknown): unknown {
   return result;
 }
 
-// Runtime delivery and the editor preview use the same ordered rules.
-export function rewriteResponse(
+// The first rule that changes the response owns the edit. Preview uses this same path.
+export async function rewriteResponse(
   rules: ResponseRule[],
   call: ToolCall,
   original: unknown,
-): { value: unknown; ruleId?: string; error?: string } {
+  models?: ModelOperations,
+): Promise<RewriteResult> {
   let commands: string[] | undefined;
+  const evidence: OverrideEvidence = {};
+  const text =
+    typeof original === "string" ? original : JSON.stringify(original);
   for (const rule of rules) {
     const target = rule.target;
     if (target.kind !== call.target.kind) continue;
-    if (target.kind === "shell" && call.target.kind === "shell") {
-      const batch = call.target.command;
-      if (target.match === "batch") {
-        if (target.command !== batch.trim()) continue;
-      } else {
-        commands ??= shellCommands(batch);
-        if (!commands.includes(target.command)) continue;
-      }
-    }
-    if (
-      target.kind === "web" &&
-      call.target.kind === "web" &&
-      target.url &&
-      target.url !== call.target.url
-    )
-      continue;
     if (
       target.kind === "mcp" &&
       call.target.kind === "mcp" &&
@@ -218,30 +245,71 @@ export function rewriteResponse(
     )
       continue;
     if (
-      rule.inputContains &&
-      !JSON.stringify(call.args).includes(rule.inputContains)
+      target.kind === "web" &&
+      call.target.kind === "web" &&
+      target.url &&
+      target.url !== call.target.url
     )
       continue;
-    const text =
-      typeof original === "string" ? original : JSON.stringify(original);
-    if (!text || (rule.outputContains && !text.includes(rule.outputContains)))
-      continue;
+    if (!rule.decision) {
+      if (target.kind === "shell" && call.target.kind === "shell") {
+        const batch = call.target.command;
+        if (target.match === "batch") {
+          if (target.command !== batch.trim()) continue;
+        } else {
+          commands ??= shellCommands(batch);
+          if (!commands.includes(target.command)) continue;
+        }
+      }
+      if (
+        rule.inputContains &&
+        !JSON.stringify(call.args).includes(rule.inputContains)
+      )
+        continue;
+      if (rule.outputContains && !text?.includes(rule.outputContains)) continue;
+    }
     try {
+      if (text === undefined || (!text && !rule.decision)) continue;
       if (text.length > limit)
         throw new Error("The response exceeds the edit limit.");
+      if (rule.decision && !models)
+        throw new Error("The override model is unavailable.");
+      if (rule.decision && models) {
+        const decision = await models.decide(
+          rule.decision.prompt,
+          call,
+          original,
+        );
+        evidence.decisions ??= [];
+        evidence.decisions.push({
+          ruleId: rule.id,
+          condition: rule.decision.prompt,
+          ...decision,
+        });
+        if (decision.probability <= 0.5) continue;
+      }
       const value = editResult(rule, original);
       const serialized =
         typeof value === "string" ? value : JSON.stringify(value);
       if (serialized.length > limit)
         throw new Error("The replacement exceeds the edit limit.");
-      if (serialized !== text) return { value, ruleId: rule.id };
+      if (serialized !== text)
+        return {
+          ...evidence,
+          value,
+          ruleId: rule.id,
+        };
     } catch (error) {
       return {
+        ...evidence,
         value: original,
         error:
           error instanceof Error ? error.message : "Cannot edit the response.",
       };
     }
   }
-  return { value: original };
+  return {
+    ...evidence,
+    value: original,
+  };
 }

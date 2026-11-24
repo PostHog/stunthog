@@ -24,7 +24,9 @@ export function ResponseOverrideList({
               target.kind === "web"
                 ? (target.url ?? "All web fetches")
                 : target.kind === "shell"
-                  ? target.command
+                  ? rule.decision
+                    ? "Shell calls"
+                    : target.command
                   : [
                       servers.find((server) => server.id === target.serverId)
                         ?.title ?? target.serverId,
@@ -46,6 +48,12 @@ export function ResponseOverrideList({
                     </small>
                   </summary>
                   <dl>
+                    {rule.decision && (
+                      <>
+                        <dt>Jev match condition</dt>
+                        <dd>{rule.decision.prompt}</dd>
+                      </>
+                    )}
                     <dt>
                       {rule.mode === "regex"
                         ? "Regular expression"
@@ -58,16 +66,16 @@ export function ResponseOverrideList({
                     <dd>
                       <code>{rule.replacement || "Delete match"}</code>
                     </dd>
-                    {rule.inputContains && (
+                    {!rule.decision && rule.inputContains && (
                       <>
                         <dt>Call input contains</dt>
-                        <dd>{rule.inputContains}</dd>
+                        <dd>{!rule.decision && rule.inputContains}</dd>
                       </>
                     )}
-                    {rule.outputContains && (
+                    {!rule.decision && rule.outputContains && (
                       <>
                         <dt>Response contains</dt>
-                        <dd>{rule.outputContains}</dd>
+                        <dd>{!rule.decision && rule.outputContains}</dd>
                       </>
                     )}
                     {rule.path && (

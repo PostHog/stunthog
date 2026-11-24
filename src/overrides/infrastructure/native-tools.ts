@@ -14,7 +14,12 @@ import { z } from "zod";
 import type { McpServer } from "../../harnesses/domain/execution.js";
 import type { HarnessInput } from "../../harnesses/domain/harness.js";
 import { resolveDataDirectory } from "../../infrastructure/data-directory.js";
-import { targetSchema } from "../domain/response-override.js";
+import {
+  decisionEvidenceSchema,
+  rewriteResponse,
+  targetSchema,
+} from "../domain/response-override.js";
+import { publish, relayTimeoutMs, requestSchema } from "./model-exchange.js";
 import { relaySource } from "./relay-source.js";
 
 const captureSchema = z.object({
@@ -25,6 +30,7 @@ const captureSchema = z.object({
   original: z.unknown(),
   delivered: z.unknown().optional(),
   inputOmitted: z.boolean().optional(),
+  decisions: z.array(decisionEvidenceSchema).max(40).optional(),
   ruleId: z.string().uuid().optional(),
   error: z.string().optional(),
 });
@@ -119,12 +125,67 @@ export async function prepareResponseTools(input: HarnessInput) {
     }
     if (web) await add();
     const processed = new Set<string>();
+    const modelRules = rules.some((rule) => rule.decision);
+    const pending = new Map<string, Promise<void>>();
+    async function answer(name: string) {
+      const path = join(directory, name);
+      const handle = await open(
+        path,
+        constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0),
+      );
+      try {
+        const stat = await handle.stat();
+        const timeLeft =
+          relayTimeoutMs - Math.max(0, Math.ceil(Date.now() - stat.mtimeMs));
+        if (!stat.isFile() || stat.size > 1_536_000 || timeLeft <= 0) return;
+        const { target, args, original } = requestSchema.parse(
+          JSON.parse(await handle.readFile("utf8")),
+        );
+        // Only the host's session snapshot can select providers, instructions, or models.
+        const call = { target, args };
+        const result = input.rewrite
+          ? await input.rewrite(
+              rules,
+              call,
+              original,
+              AbortSignal.timeout(timeLeft),
+            )
+          : await rewriteResponse(rules, call, original);
+        if ((await realpath(directory)) === canonical)
+          await publish(
+            path.replace(/\.request$/, ".reply"),
+            JSON.stringify(result),
+          );
+      } finally {
+        await handle.close();
+      }
+    }
     async function drain() {
       if ((await realpath(directory)) !== canonical)
         throw new Error("Invalid response tool directory.");
       for (const file of await readdir(directory, {
         withFileTypes: true,
       })) {
+        if (
+          modelRules &&
+          file.isFile() &&
+          /^[a-f0-9-]{36}\.request$/.test(file.name)
+        ) {
+          if (
+            !processed.has(file.name) &&
+            pending.size < 4 &&
+            !input.signal.aborted
+          ) {
+            processed.add(file.name);
+            pending.set(
+              file.name,
+              answer(file.name)
+                .catch(() => {})
+                .finally(() => pending.delete(file.name)),
+            );
+          }
+          continue;
+        }
         if (
           processed.has(file.name) ||
           !file.isFile() ||
@@ -154,15 +215,18 @@ export async function prepareResponseTools(input: HarnessInput) {
 
     // A relay atomically renames each completed response. Only one reader drains the directory at a time.
     let reading: Promise<void> | undefined;
-    const timer = setInterval(() => {
-      reading ??= drain()
-        .catch(() => {
-          // Leave unread captures for the next pass. The final drain reports persistent errors.
-        })
-        .finally(() => {
-          reading = undefined;
-        });
-    }, 750);
+    const timer = setInterval(
+      () => {
+        reading ??= drain()
+          .catch(() => {
+            // Leave unread captures for the next pass. The final drain reports persistent errors.
+          })
+          .finally(() => {
+            reading = undefined;
+          });
+      },
+      modelRules ? 100 : 750,
+    );
     timer.unref();
     return {
       input: { ...input, mcps: servers },
@@ -172,6 +236,7 @@ export async function prepareResponseTools(input: HarnessInput) {
         try {
           await reading;
           await drain();
+          await Promise.all(pending.values());
         } finally {
           await rm(directory, { recursive: true, force: true });
         }

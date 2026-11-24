@@ -10,8 +10,8 @@ import {
 import { z } from "zod";
 import { EvaluationsService } from "../evaluations/application/evaluations-service.js";
 import { Database } from "../infrastructure/database.js";
+import { ModelRewriter } from "../overrides/application/model-rewriter.js";
 import {
-  rewriteResponse,
   ruleSchema,
   targetSchema,
 } from "../overrides/domain/response-override.js";
@@ -20,6 +20,7 @@ import { StartSessions } from "../sessions/application/start-sessions.js";
 @Controller("api/evals")
 export class EvaluationsController {
   constructor(
+    @Inject(ModelRewriter) private readonly rewriter: ModelRewriter,
     @Inject(Database) private readonly db: Database,
     @Inject(EvaluationsService) private readonly evals: EvaluationsService,
     @Inject(StartSessions) private readonly sessions: StartSessions,
@@ -73,7 +74,7 @@ export class EvaluationsController {
         original: z.union([z.string(), z.record(z.unknown())]),
       })
       .parse(input);
-    return rewriteResponse([sample.rule], sample, sample.original);
+    return this.rewriter.forSession()([sample.rule], sample, sample.original);
   }
 
   @Post(":id/response-overrides")

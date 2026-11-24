@@ -3,6 +3,7 @@ import type { ModelSettingsData } from "../../evaluations/domain/model-settings.
 import type {
   ResponseCapture,
   ResponseRule,
+  Rewrite,
 } from "../../overrides/domain/response-override.js";
 
 export interface ProcessCommand {
@@ -68,6 +69,7 @@ export interface HarnessRequest {
   apiKey?: string;
   mcps?: McpServer[];
   responseOverrides?: ResponseRule[];
+  rewrite?: Rewrite;
   onToolResponse?: (capture: ResponseCapture) => Promise<void>;
   onRawEvent?: (event: unknown) => Promise<void>;
   runtime?: HarnessRuntime;
