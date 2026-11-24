@@ -77,6 +77,7 @@ test("Codex updates one command row and retains failed exit status", () => {
   assert.equal(result.length, 1);
   assert.equal(result[0]?.status, "failed");
   assert.equal(result[0]?.output, "Test failed");
+  assert.equal(result[0]?.exitCode, 1);
 });
 
 test("Claude pairs tool messages and does not repeat its final response", () => {

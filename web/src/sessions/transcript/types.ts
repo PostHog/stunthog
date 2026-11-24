@@ -20,6 +20,7 @@ export interface TranscriptEntry {
   title: string;
   text: string;
   output?: string;
+  exitCode?: number;
   status?: "running" | "passed" | "failed";
 }
 
