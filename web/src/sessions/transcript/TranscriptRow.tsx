@@ -20,6 +20,7 @@ import {
   type MatchRanges,
   type TranscriptMatches,
 } from "./search.js";
+import { terminalText } from "./terminal-text.js";
 import type { TranscriptEntry } from "./types.js";
 
 function Highlighted({
@@ -155,12 +156,16 @@ export function TranscriptRow({
                     </TabsList>
                     <TabsContent value="diff">
                       <ResponseComparison
-                        before={displayResponse(modified.original)}
+                        before={terminalText(
+                          displayResponse(modified.original),
+                        )}
                         after={entry.output ?? ""}
                       />
                     </TabsContent>
                     <TabsContent value="original">
-                      <pre>{displayResponse(modified.original)}</pre>
+                      <pre>
+                        {terminalText(displayResponse(modified.original))}
+                      </pre>
                     </TabsContent>
                     <TabsContent value="modified">
                       <pre>
