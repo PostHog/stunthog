@@ -12,10 +12,12 @@ export function ModelBehaviorDrift({
   session,
   entries,
   onInspect,
+  onEvidence,
 }: {
   session: Session;
   entries: TranscriptEntry[];
   onInspect: (callId: string) => void;
+  onEvidence?: (entryId: string) => void;
 }) {
   const findings = session.behaviorDrift ?? [];
   const rules = session.snapshot.evaluation.responseOverrides ?? [];
@@ -29,12 +31,26 @@ export function ModelBehaviorDrift({
       <h2>Model behavior drift</h2>
       {findings.length ? (
         <ul>
-          {findings.map(({ callId, outcome, explanation }) => {
+          {findings.map(({ callId, outcome, explanation, evidenceQuotes }) => {
             const entry = calls.get(callId);
             const index = rules.findIndex(
               (rule) => rule.id === entry?.capture?.ruleId,
             );
             const rule = rules[index];
+            const later = entry
+              ? entries.slice(entries.indexOf(entry) + 1)
+              : [];
+            const quotes =
+              evidenceQuotes ??
+              Array.from(
+                explanation.matchAll(/["“`]([^"”`]{4,600})["”`]/g),
+                (match) => match[1] ?? "",
+              );
+            const cited = new Set<TranscriptEntry>();
+            for (const quote of quotes) {
+              const matches = later.filter((row) => row.text.includes(quote));
+              if (matches.length === 1 && matches[0]) cited.add(matches[0]);
+            }
             return (
               <li key={callId}>
                 <strong>{outcomes[outcome]}</strong>
@@ -59,6 +75,17 @@ export function ModelBehaviorDrift({
                   </small>
                 )}
                 <p>{explanation}</p>
+                {onEvidence &&
+                  [...cited].map((row) => (
+                    <button
+                      key={row.id}
+                      type="button"
+                      className="drift-trace-link"
+                      onClick={() => onEvidence(row.id)}
+                    >
+                      Evidence · {row.title || row.kind} · Trace #{row.sequence}
+                    </button>
+                  ))}
               </li>
             );
           })}
