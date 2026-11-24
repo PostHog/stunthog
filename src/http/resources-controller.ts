@@ -16,6 +16,7 @@ import type { Request, Response } from "express";
 import { z } from "zod";
 import { Resource } from "../catalog/domain/resource.js";
 import { ResourceRepository } from "../catalog/domain/resource-repository.js";
+import { inspectRemote } from "../catalog/infrastructure/inspect-remote.js";
 import { McpOAuth } from "../catalog/infrastructure/mcp-oauth.js";
 import { DEFAULT_DOCKERFILE } from "../sessions/domain/default-dockerfile.js";
 
@@ -43,6 +44,15 @@ export class ResourcesController {
   @Get("default-dockerfile")
   defaultDockerfile() {
     return { content: DEFAULT_DOCKERFILE };
+  }
+
+  @Get(":id/connection")
+  async connection(@Param("id") id: string) {
+    const server = (await this.catalog.list()).mcps.find(
+      (mcp) => mcp.id === id,
+    );
+    if (!server?.url) throw new Error("Select a saved remote MCP server.");
+    return inspectRemote(server.url, await this.oauth.accessToken(server.url));
   }
 
   @Post(":id/connect")

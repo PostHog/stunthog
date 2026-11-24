@@ -1,6 +1,7 @@
 import { Button, Checkbox, Input } from "@posthog/quill";
 import { useId, useState } from "react";
 import { Choice } from "../Choice.js";
+import { McpConnection } from "../resources/McpConnection.js";
 import { type ResourceKind, resourceInfo } from "../resources/resource-info.js";
 import type { EvalDraft, Harness, Resource } from "../types.js";
 
@@ -146,6 +147,9 @@ export function ResourceSelection({
                   />
                   {resource.title}
                 </label>
+                {kind === "mcps" && checked && resource.url && (
+                  <McpConnection id={resource.id} />
+                )}
                 {judgeMcp && checked && (
                   <JudgeMcpTools
                     title={resource.title}
