@@ -21,10 +21,13 @@ import { webTool } from "./web.js";
 
 export function sessionBash(request: HarnessRequest) {
   const runtime = request.runtime;
-  const bash = createBashToolDefinition(
-    request.workspace,
-    runtime ? { operations: { exec: runtime.shell.bind(runtime) } } : undefined,
-  );
+  const bash = createBashToolDefinition(request.workspace, {
+    ...(runtime && { operations: { exec: runtime.shell.bind(runtime) } }),
+    spawnHook(context) {
+      delete context.env.TYPESAFE_API_KEY;
+      return context;
+    },
+  });
   const rules = request.responseOverrides?.filter(
     (rule) => rule.target.kind === "shell",
   );
@@ -41,6 +44,7 @@ export function sessionBash(request: HarnessRequest) {
         block.text,
         id,
         request.onToolResponse,
+        request.rewrite,
       );
       return { ...result, content: [{ ...block, text }] };
     }

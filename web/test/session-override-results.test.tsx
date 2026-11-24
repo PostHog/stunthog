@@ -24,6 +24,14 @@ test("only a modified tool has response tabs, with its diff selected first", asy
       original: "npm install sdk",
       delivered: "bun add sdk",
       ruleId: "r",
+      decisions: [
+        {
+          ruleId: "r",
+          condition: "Is this an installation guide?",
+          model: "jev-test",
+          probability: 0.95,
+        },
+      ],
     },
   };
   try {
@@ -37,6 +45,8 @@ test("only a modified tool has response tabs, with its diff selected first", asy
       "true",
     );
     assert.ok(document.querySelector(".diff-add"));
+    assert.ok(screen.getByText(/95% match probability/));
+
     fireEvent.click(screen.getByRole("tab", { name: "Original" }));
     assert.equal(
       (await screen.findByRole("tabpanel", { name: "Original" })).textContent,

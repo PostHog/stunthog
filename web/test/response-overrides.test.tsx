@@ -39,7 +39,9 @@ test("the inline Bash editor saves one command from a batch and previews its com
   try {
     globalThis.fetch = (async (_path, opts) => {
       const body = JSON.parse(String(opts?.body));
-      return Response.json(rewriteResponse([body.rule], body, body.original));
+      return Response.json(
+        await rewriteResponse([body.rule], body, body.original),
+      );
     }) as typeof fetch;
     render(
       <OverrideDialog
@@ -86,17 +88,19 @@ test("the inline Bash editor saves one command from a batch and previews its com
       match: "command",
       command,
     });
-    const nextResponse = (next: string) =>
-      rewriteResponse(
-        [saved as ResponseRule],
-        {
-          target: { kind: "shell", match: "batch", command: next },
-          args: { command: next },
-        },
-        original,
+    const nextResponse = async (next: string) =>
+      (
+        await rewriteResponse(
+          [saved as ResponseRule],
+          {
+            target: { kind: "shell", match: "batch", command: next },
+            args: { command: next },
+          },
+          original,
+        )
       ).value;
-    assert.equal(nextResponse(`ls && ${command}`), edited);
-    assert.equal(nextResponse("grep version package.json"), original);
+    assert.equal(await nextResponse(`ls && ${command}`), edited);
+    assert.equal(await nextResponse("grep version package.json"), original);
   } finally {
     cleanup();
     globalThis.fetch = previous;
@@ -131,7 +135,9 @@ test("the call browser shows session context and applies a rule to the selected 
         return Response.json({ calls: [sample], next: null });
       if (String(path).endsWith("/1")) return Response.json(sample);
       const req = JSON.parse(String(opts?.body));
-      return Response.json(rewriteResponse([req.rule], req, req.original));
+      return Response.json(
+        await rewriteResponse([req.rule], req, req.original),
+      );
     }) as typeof fetch;
     render(
       <form onSubmit={() => assert.fail("The evaluation must not submit")}>
@@ -226,7 +232,9 @@ test("a Bash sample seeds both edit fields and previews before the author choose
         return Response.json({ calls: [shell], next: null });
       if (String(path).endsWith("/3")) return Response.json(shell);
       const body = JSON.parse(String(opts?.body));
-      return Response.json(rewriteResponse([body.rule], body, body.original));
+      return Response.json(
+        await rewriteResponse([body.rule], body, body.original),
+      );
     }) as typeof fetch;
     render(
       <OverrideDialog
@@ -299,7 +307,9 @@ test("direct edits to a structured MCP response keep the tool and field from the
     globalThis.fetch = (async (url, options) => {
       if (String(url).endsWith("/tools")) return Response.json(["read_docs"]);
       const body = JSON.parse(String(options?.body));
-      return Response.json(rewriteResponse([body.rule], body, body.original));
+      return Response.json(
+        await rewriteResponse([body.rule], body, body.original),
+      );
     }) as typeof fetch;
     render(
       <OverrideDialog
@@ -325,11 +335,68 @@ test("direct edits to a structured MCP response keep the tool and field from the
     assert.equal(saved.path, "/setup");
     assert.deepEqual(saved.target, target);
     assert.deepEqual(
-      rewriteResponse([saved], { target, args: {} }, original).value,
+      (await rewriteResponse([saved], { target, args: {} }, original)).value,
       { structuredContent: { setup: "bun add sdk\r\nstart()" } },
     );
   } finally {
     cleanup();
     globalThis.fetch = previous;
+  }
+});
+
+test("a model override previews only on request and saves the match condition", async () => {
+  const old = globalThis.fetch;
+  let requests = 0;
+  let saved: ResponseRule | undefined;
+  try {
+    globalThis.fetch = (async (_url, options) => {
+      requests++;
+      const { rule } = JSON.parse(String(options?.body));
+      return Response.json({
+        value: "Run setup next.",
+        ruleId: rule.id,
+        decisions: [{ ruleId: rule.id, model: "jev-test", probability: 0.98 }],
+      });
+    }) as typeof fetch;
+    render(
+      <OverrideDialog
+        inline
+        servers={[]}
+        sample={{
+          target: {
+            kind: "shell",
+            match: "batch",
+            command: "npm install other posthog-js",
+          },
+          args: { command: "npm install other posthog-js" },
+          callId: "sample",
+          route: "Bash",
+          original: "Done.",
+        }}
+        onApply={(rule) => {
+          saved = rule;
+        }}
+        onClose={() => {}}
+      />,
+    );
+    fireEvent.click(screen.getByRole("tab", { name: "Decision model" }));
+    fireEvent.change(screen.getByLabelText("When should Jev match a call?"), {
+      target: { value: "The command installs posthog-js." },
+    });
+    editResponse("Run setup next.");
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 240));
+    });
+    assert.equal(requests, 0);
+    fireEvent.click(screen.getByRole("button", { name: "Preview with model" }));
+    await screen.findByText(/98% match probability/);
+    fireEvent.click(screen.getByRole("button", { name: "Apply override" }));
+    await waitFor(() =>
+      assert.equal(saved?.decision?.prompt, "The command installs posthog-js."),
+    );
+    assert.equal(requests, 1);
+  } finally {
+    cleanup();
+    globalThis.fetch = old;
   }
 });

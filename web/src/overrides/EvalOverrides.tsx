@@ -64,8 +64,15 @@ export function EvalOverrides({
                   {rule.target.kind === "web"
                     ? rule.target.url || "All managed web fetches"
                     : rule.target.kind === "shell"
-                      ? rule.target.command
+                      ? rule.decision
+                        ? "Shell calls"
+                        : rule.target.command
                       : rule.target.tool || "MCP tools"}
+                  {rule.decision && (
+                    <small className="muted">
+                      Jev · {rule.decision.prompt}
+                    </small>
+                  )}
                   <small className="muted">Find {rule.find}</small>
                 </span>
               </Button>

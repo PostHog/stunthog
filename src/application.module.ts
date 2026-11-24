@@ -22,6 +22,9 @@ import { SessionsController } from "./http/sessions-controller.js";
 import { SettingsController } from "./http/settings-controller.js";
 import { ToolCallsController } from "./http/tool-calls-controller.js";
 import { Database } from "./infrastructure/database.js";
+import { DecisionModel } from "./overrides/application/model-ports.js";
+import { ModelRewriter } from "./overrides/application/model-rewriter.js";
+import { JevDecisionModel } from "./overrides/infrastructure/model-providers.js";
 import { SessionQueue } from "./sessions/application/session-queue.js";
 import { SessionWorker } from "./sessions/application/session-worker.js";
 import { StartSessions } from "./sessions/application/start-sessions.js";
@@ -51,6 +54,8 @@ import { PrismaSettingsRepository } from "./settings/infrastructure/prisma-setti
     { provide: McpAuthorization, useExisting: McpOAuth },
     PiHarness,
     ProviderCreditsService,
+    ModelRewriter,
+    { provide: DecisionModel, useClass: JevDecisionModel },
     SessionWorker,
     SessionQueue,
     SettingsService,

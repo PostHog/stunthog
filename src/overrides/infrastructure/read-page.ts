@@ -2,6 +2,7 @@ import { z } from "zod";
 import type {
   ResponseCapture,
   ResponseRule,
+  Rewrite,
 } from "../domain/response-override.js";
 import { deliverResponse } from "./deliver.js";
 export async function readPage(
@@ -57,6 +58,7 @@ export async function fetchPage(
   id = "",
   record?: (capture: ResponseCapture) => Promise<void>,
   route = "web_fetch",
+  rewrite?: Rewrite,
 ) {
   const page = await readPage(url, signal);
   const body = await deliverResponse(
@@ -66,6 +68,7 @@ export async function fetchPage(
     id,
     route,
     record,
+    rewrite,
   );
   return `URL: ${page.url}\n\n${body}${page.truncated ? "\n[Response truncated at 50,000 characters.]" : ""}`;
 }

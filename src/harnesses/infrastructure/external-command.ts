@@ -12,11 +12,17 @@ export async function externalCommand(
   const managedWeb = input.responseOverrides?.some(
     (rule) => rule.target.kind === "web",
   );
+  const hookTimeout = input.responseOverrides?.some(
+    (r) => r.target.kind === "shell" && r.decision,
+  )
+    ? 50
+    : 10;
   const model = input.settings.model;
   const effort = input.settings.effort;
   const env = input.runtime?.kind === "docker" ? {} : { ...process.env };
 
   for (const key of [
+    "TYPESAFE_API_KEY",
     "OPENAI_API_KEY",
     "CODEX_API_KEY",
     "ANTHROPIC_API_KEY",
@@ -94,6 +100,7 @@ export async function externalCommand(
         ...(shellHook
           ? codexShellHook(
               shellHook,
+              hookTimeout,
               input.runtime?.kind !== "docker" && process.platform === "win32",
             )
           : []),
@@ -161,7 +168,7 @@ export async function externalCommand(
                         {
                           type: "command",
                           command: shellHook,
-                          timeout: 10,
+                          timeout: hookTimeout,
                         },
                       ],
                     },
@@ -263,12 +270,16 @@ export async function externalCommand(
   };
 }
 
-function codexShellHook(command: string, windows: boolean) {
+function codexShellHook(
+  command: string,
+  hookTimeout: number,
+  windows: boolean,
+) {
   const matcher = "^Bash$";
   // Codex fingerprints the normalized declaration. Trust only this session's generated command.
   const identity = {
     event_name: "post_tool_use",
-    hooks: [{ async: false, command, timeout: 10, type: "command" }],
+    hooks: [{ async: false, command, timeout: hookTimeout, type: "command" }],
     matcher,
   };
   const hash = createHash("sha256")
@@ -280,7 +291,7 @@ function codexShellHook(command: string, windows: boolean) {
   const key = JSON.stringify(`${source}:post_tool_use:0:0`);
   return [
     "-c",
-    `hooks.PostToolUse=[{matcher="${matcher}",hooks=[{type="command",command=${JSON.stringify(command)},timeout=10}]}]`,
+    `hooks.PostToolUse=[{matcher="${matcher}",hooks=[{type="command",command=${JSON.stringify(command)},timeout=${hookTimeout}}]}]`,
     "-c",
     `hooks.state={${key}={trusted_hash="sha256:${hash}"}}`,
   ];

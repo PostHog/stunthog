@@ -57,7 +57,7 @@ const shellRule: ResponseRule = {
   replacement: "modified",
 };
 
-test("shell rules match complete commands inside batches and keep quoted text and here-documents intact", () => {
+test("shell rules match complete commands inside batches and keep quoted text and here-documents intact", async () => {
   const cmd = "grep posthog package.json";
   const batch = `npm install posthog-js 2>&1 | tail -5; ${cmd}`;
   const call = (command: string) => ({
@@ -68,21 +68,21 @@ test("shell rules match complete commands inside batches and keep quoted text an
     ...shellRule,
     target: { kind: "shell", match: "command", command: cmd },
   };
-  const apply = (input: string, saved = rule) =>
-    rewriteResponse([saved], call(input), "original").value;
+  const apply = async (input: string, saved = rule) =>
+    (await rewriteResponse([saved], call(input), "original")).value;
   assert.deepEqual(shellCommands(batch), [
     "npm install posthog-js",
     "tail -5",
     cmd,
   ]);
-  assert.equal(apply(`pwd && ${cmd} | cat`), "modified");
-  assert.equal(apply(cmd), "modified");
-  assert.equal(apply(`${cmd}.bak`), "original");
-  assert.equal(apply(`${cmd} >& output.txt`), "original");
-  assert.equal(apply(`echo '${cmd}'; echo "a|b"`), "original");
+  assert.equal(await apply(`pwd && ${cmd} | cat`), "modified");
+  assert.equal(await apply(cmd), "modified");
+  assert.equal(await apply(`${cmd}.bak`), "original");
+  assert.equal(await apply(`${cmd} >& output.txt`), "original");
+  assert.equal(await apply(`echo '${cmd}'; echo "a|b"`), "original");
   const heredoc = `cat <<'EOF'\n${cmd}\nEOF\necho 'a;b'`;
   assert.deepEqual(shellCommands(heredoc), ["cat <<'EOF'", "echo 'a;b'"]);
-  assert.equal(apply(heredoc), "original");
+  assert.equal(await apply(heredoc), "original");
   assert.deepEqual(
     shellCallTarget("command_execution", {
       command: `/bin/zsh -lc '${batch}'`,
@@ -91,44 +91,61 @@ test("shell rules match complete commands inside batches and keep quoted text an
   );
   assert.deepEqual(shellCommands('echo "incomplete'), []);
   assert.equal(
-    apply(batch, { ...rule, target: call(batch).target }),
+    await apply(batch, { ...rule, target: call(batch).target }),
     "modified",
   );
-  assert.equal(apply(cmd, { ...rule, target: call(batch).target }), "original");
+  assert.equal(
+    await apply(cmd, { ...rule, target: call(batch).target }),
+    "original",
+  );
 });
 
-test("rules match call and output independently, preserve structured results, and bound regex replacement", () => {
+test("rules match call and output independently, preserve structured results, and bound regex replacement", async () => {
   const call = {
     target: { kind: "web" as const, url: "https://example.com/" },
     args: { url: "https://example.com/" },
   };
   const original = "App Router: install old";
   assert.equal(
-    rewriteResponse([webRule], call, original).value,
+    (await rewriteResponse([webRule], call, original)).value,
     "App Router: use new (old)",
   );
   assert.equal(
-    rewriteResponse([{ ...webRule, inputContains: "other" }], call, original)
-      .ruleId,
+    (
+      await rewriteResponse(
+        [{ ...webRule, inputContains: "other" }],
+        call,
+        original,
+      )
+    ).ruleId,
     undefined,
   );
   assert.equal(
-    rewriteResponse(
-      [{ ...webRule, target: { kind: "web", url: "https://other.example/" } }],
-      call,
-      original,
+    (
+      await rewriteResponse(
+        [
+          {
+            ...webRule,
+            target: { kind: "web", url: "https://other.example/" },
+          },
+        ],
+        call,
+        original,
+      )
     ).value,
     original,
   );
   assert.equal(
-    rewriteResponse([webRule], call, "install old").ruleId,
+    (await rewriteResponse([webRule], call, "install old")).ruleId,
     undefined,
   );
   assert.equal(
-    rewriteResponse(
-      [{ ...webRule, replacement: "install old" }, webRule],
-      call,
-      original,
+    (
+      await rewriteResponse(
+        [{ ...webRule, replacement: "install old" }, webRule],
+        call,
+        original,
+      )
     ).ruleId,
     webRule.id,
   );
@@ -140,7 +157,7 @@ test("rules match call and output independently, preserve structured results, an
       { type: "image", data: "doc" },
     ],
   };
-  const updated = rewriteResponse(
+  const updated = await rewriteResponse(
     [{ ...mcpRule, path: "/title" }],
     { target: mcpRule.target, args: {} },
     result,
@@ -155,7 +172,7 @@ test("rules match call and output independently, preserve structured results, an
   });
   assert.equal(result.structuredContent.title, "doc");
   assert.equal(ruleSchema.safeParse({ ...webRule, find: "(" }).success, false);
-  const bounded = rewriteResponse(
+  const bounded = await rewriteResponse(
     [
       {
         ...webRule,
@@ -265,7 +282,24 @@ for (const docker of [false, true])
             arguments: [runtime.filePath?.(file) ?? file],
           },
         ],
-        responseOverrides: [webRule, mcpRule, shellRule],
+        responseOverrides: [
+          {
+            ...webRule,
+            decision: { prompt: "Is this an installation guide?" },
+          },
+          {
+            ...mcpRule,
+            decision: { prompt: "Is this a document?" },
+          },
+          {
+            ...shellRule,
+            decision: { prompt: "Does this print the original text?" },
+          },
+        ],
+        rewrite: (rules, call, original) =>
+          rewriteResponse(rules, call, original, {
+            decide: async () => ({ model: "fixture", probability: 0.98 }),
+          }),
         onToolResponse: async (capture) => {
           snapshots.push(capture);
         },
@@ -418,12 +452,22 @@ for (const docker of [false, true])
               { binary: "node", args: hookArgs, env: {} },
               f.workspace,
             );
-            const hookRun = Bun.spawnSync(
+            const hookRun = Bun.spawn(
               [hookProcess.binary, ...hookProcess.args],
-              { cwd: f.workspace, stdin: Buffer.from(event) },
+              {
+                cwd: f.workspace,
+                stdin: Buffer.from(event),
+                stdout: "pipe",
+                stderr: "pipe",
+              },
             );
-            assert.equal(hookRun.exitCode, 0, hookRun.stderr.toString());
-            assert.match(hookRun.stdout.toString(), /modified output/);
+            const [exitCode, stdout, stderr] = await Promise.all([
+              hookRun.exited,
+              new Response(hookRun.stdout).text(),
+              new Response(hookRun.stderr).text(),
+            ]);
+            assert.equal(exitCode, 0, stderr);
+            assert.match(stdout, /modified output/);
             let commands: string[][];
             if (harness === "claude") {
               const config = JSON.parse(
@@ -508,6 +552,10 @@ for (const docker of [false, true])
           }
         }
         assert.equal(snapshots.length, 12);
+
+        const shells = snapshots.filter((c) => c.target.kind === "shell");
+        assert.equal(shells.length, 4);
+        assert.ok(shells.every((c) => c.decisions?.[0]?.probability === 0.98));
         assert.ok(
           snapshots.every(
             (c) => c.ruleId && c.delivered && c.original !== c.delivered,
@@ -523,7 +571,7 @@ for (const docker of [false, true])
     },
   );
 
-test("sample defaults match a single editable MCP field and respect the maximum pattern length", () => {
+test("sample defaults match a single editable MCP field and respect the maximum pattern length", async () => {
   const target = {
     kind: "mcp",
     serverId: crypto.randomUUID(),
@@ -558,7 +606,7 @@ test("sample defaults match a single editable MCP field and respect the maximum 
     outputContains: "",
   });
   assert.equal(
-    rewriteResponse([rule], { target, args: {} }, original).ruleId,
+    (await rewriteResponse([rule], { target, args: {} }, original)).ruleId,
     rule.id,
   );
   const longText = `${"a".repeat(maxFindLength - 1)}😀extra`;
@@ -570,7 +618,7 @@ test("sample defaults match a single editable MCP field and respect the maximum 
   );
 });
 
-test("direct edits reproduce insertions, deletions and changes deep in a long or repetitive response", () => {
+test("direct edits reproduce insertions, deletions and changes deep in a long or repetitive response", async () => {
   const page = "setup instructions\n".repeat(400);
   for (const [before, after] of [
     [`${page}npm i sdk\n`, `${page}bun add sdk\n`],
@@ -591,7 +639,8 @@ test("direct edits reproduce insertions, deletions and changes deep in a long or
       outputContains: "",
     });
     assert.equal(
-      rewriteResponse([rule], { target: rule.target, args: {} }, before).value,
+      (await rewriteResponse([rule], { target: rule.target, args: {} }, before))
+        .value,
       after,
     );
   }
