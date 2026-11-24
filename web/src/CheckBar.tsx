@@ -48,7 +48,9 @@ export function CheckBar({
             <span
               className={`criterion-mark ${item.passed === undefined ? "unassessed" : status}`}
               aria-hidden="true"
-            />
+            >
+              {item.passed === undefined ? "" : item.passed ? "✓" : "×"}
+            </span>
           </Tooltip>
         );
       })}
