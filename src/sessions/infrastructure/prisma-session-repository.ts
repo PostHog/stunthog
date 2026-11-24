@@ -82,7 +82,9 @@ export class PrismaSessionRepository extends SessionRepository {
                 : null,
             }
           : {}),
-        ...(data.status === "running" ? { startedAt: new Date() } : {}),
+        ...(data.status === "running" && !previous.startedAt
+          ? { startedAt: new Date() }
+          : {}),
         ...(finished
           ? {
               finishedAt: new Date(),

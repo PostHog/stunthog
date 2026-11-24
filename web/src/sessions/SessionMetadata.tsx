@@ -63,6 +63,16 @@ export function SessionMetadata({ session }: { session: Session }) {
       <div>
         <DetailLabel icon={IconClock}>Duration</DetailLabel>
         <dd>{duration(session.durationMs)}</dd>
+        {session.agentResult && (
+          <dd className="muted">
+            Agent {duration(session.agentResult.durationMs)}
+          </dd>
+        )}
+        {session.judgeResult && (
+          <dd className="muted">
+            Judge {duration(session.judgeResult.durationMs)}
+          </dd>
+        )}
       </div>
       <div>
         <DetailLabel icon={IconSort}>Tokens in / out</DetailLabel>
