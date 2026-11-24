@@ -490,7 +490,9 @@ export function OverrideDialog({
         : !rule.find || sameText
           ? direct
             ? "Edit the response for the agent."
-            : "Enter the text to replace."
+            : sameText
+              ? "Change the replacement text to edit this response."
+              : "Enter the text to replace."
           : !validServer
             ? "Select an MCP server."
             : result?.ruleId
