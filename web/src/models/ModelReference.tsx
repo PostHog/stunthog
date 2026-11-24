@@ -68,6 +68,14 @@ export function HarnessIcon({ harness }: { harness: string }) {
   );
 }
 
+export function useModelName() {
+  const catalog = useContext(Catalog);
+  return (harness: string, model: string) =>
+    catalog
+      .find((item) => item.id === harness)
+      ?.models.find((item) => item.id === model)?.name ??
+    modelDisplayName(model);
+}
 export function ModelReference({
   harness,
   model,
@@ -75,13 +83,7 @@ export function ModelReference({
   harness: string;
   model: string;
 }) {
-  const catalog = useContext(Catalog);
-  const name =
-    catalog
-      .find((item) => item.id === harness)
-      ?.models.find((item) => item.id === model)?.name ??
-    modelDisplayName(model);
-
+  const name = useModelName()(harness, model);
   return (
     <span className="model-reference">
       <HarnessIcon harness={harness} />

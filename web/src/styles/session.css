@@ -283,3 +283,7 @@
   min-height: 32px;
   margin: 8px 0;
 }
+
+.session-log-view[hidden] {
+  display: none;
+}

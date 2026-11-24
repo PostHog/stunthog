@@ -8,7 +8,7 @@ import {
   TableHeader,
   TableRow,
 } from "@posthog/quill";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useApi } from "../api.js";
 import { Choice } from "../Choice.js";
 import {
@@ -20,7 +20,7 @@ import {
   number,
   Status,
 } from "../components.js";
-import { ModelReference } from "../models/ModelReference.js";
+import { ModelReference, useModelName } from "../models/ModelReference.js";
 import { EmptyState, RequestState } from "../PageState.js";
 import type { Session } from "../types.js";
 import { filterSessions, isActive } from "./session-filters.js";
@@ -205,11 +205,17 @@ function ResultTable({ filtered }: { filtered: Summary[] }) {
                   </TableCell>
                   <TableCell className="verdict-preview">
                     <p className="cell-description">
-                      {session.error ?? session.verdict ?? "Awaiting judgment"}
+                      {session.verdict ??
+                        (isActive(session)
+                          ? "Awaiting judgment"
+                          : "No judgment")}
                     </p>
                   </TableCell>
                   <TableCell>
                     <Status value={session.status} />
+                    {session.error && (
+                      <p className="cell-description">{session.error}</p>
+                    )}
                   </TableCell>
                   <TableCell>{number(session.interceptedCalls)}</TableCell>
                   <TableCell>{duration(session.durationMs)}</TableCell>
@@ -230,10 +236,24 @@ function ResultTable({ filtered }: { filtered: Summary[] }) {
   );
 }
 
-function useFilters() {
-  const [search, setSearch] = useState("");
-  const [model, setModel] = useState("");
-  const [status, setStatus] = useState("");
+function useFilters(rememberFilters=false) {
+  const saved = new URLSearchParams(
+    rememberFilters ? location.hash.split("?")[1] : "",
+  );
+  const [model, setModel] = useState(() => saved.get("model") ?? "");
+  const [status, setStatus] = useState(() => saved.get("status") ?? "");
+  const [search, setSearch] = useState(() => saved.get("q") ?? "");
+  useEffect(() => {
+    if (!rememberFilters) return;
+    const query = new URLSearchParams();
+    for (const [key, value] of Object.entries({ model, status, q: search }))
+      if (value) query.set(key, value);
+    history.replaceState(
+      history.state,
+      "",
+      query.size ? `#sessions?${query}` : "#sessions",
+    );
+  }, [rememberFilters, model, status, search]);
   return { model, status, search, setModel, setStatus, setSearch };
 }
 function NoSessions() {
@@ -246,11 +266,13 @@ function NoSessions() {
 
 export function SessionsTable({ sessions }: { sessions: Session[] }) {
   const filters = useFilters();
+  const displayName=useModelName();
   const filtered = filterSessions(
     sessions,
     filters.search,
     filters.model,
     filters.status,
+    displayName,
   );
   return sessions.length ? (
     <>
@@ -273,7 +295,8 @@ export function SessionsTable({ sessions }: { sessions: Session[] }) {
 }
 
 function HistoryTable({ sessions }: { sessions: HistoryIndex[] }) {
-  const filters = useFilters();
+  const displayName=useModelName();
+  const filters = useFilters(true);
   const [offset, setOffset] = useState(0);
   const query = filters.search.trim().toLowerCase();
   const filtered = sessions.filter(
@@ -289,7 +312,7 @@ function HistoryTable({ sessions }: { sessions: HistoryIndex[] }) {
         row.title,
         row.environment,
         row.model,
-        row.model.replaceAll("-", " "),
+        displayName(row.harness,row.model),
         row.harness,
       ].some((x) => x?.toLowerCase().includes(query)),
   );
