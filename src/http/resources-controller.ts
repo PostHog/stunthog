@@ -50,7 +50,7 @@ export class ResourcesController {
   }
 
   @Get(":id/connection")
-  async connection(@Param("id") id: string) {
+  async connection(@Param("id") id: string, @Query("tools") tools?: string) {
     const server = (await this.catalog.list()).mcps.find(
       (mcp) => mcp.id === id,
     );
@@ -59,6 +59,7 @@ export class ResourcesController {
       return await inspectRemote(
         server.url,
         await this.oauth.accessToken(server.url),
+        tools === "1",
       );
     } catch (error) {
       if (error instanceof McpReconnectRequired)

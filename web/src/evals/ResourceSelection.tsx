@@ -1,5 +1,6 @@
 import { Button, Checkbox, Input } from "@posthog/quill";
 import { useId, useState } from "react";
+import { useApi } from "../api.js";
 import { Choice } from "../Choice.js";
 import { McpConnection } from "../resources/McpConnection.js";
 import { type ResourceKind, resourceInfo } from "../resources/resource-info.js";
@@ -29,22 +30,86 @@ export function missingJudgeMcpTools(value: EvalDraft): boolean {
   return value.judgeMcpIds.some((id) => !value.judgeMcpTools[id]?.length);
 }
 
+function RemoteJudgeTools({
+  resource,
+  selected,
+  onChange,
+}: {
+  resource: Resource;
+  selected: string[];
+  onChange: (value: string[]) => void;
+}) {
+  const prefix = useId();
+  const { data, error, refresh } = useApi<{
+    status: string;
+    tools?: { name: string; description: string; readOnly: boolean }[];
+  }>(`/resources/${resource.id}/connection?tools=1`);
+  return (
+    <fieldset>
+      <legend>Allowed judge tools</legend>
+      <Button type="button" onClick={refresh}>
+        Refresh tool list
+      </Button>
+      {error || data?.status !== "ready" ? (
+        <p>
+          {data || error
+            ? "Connect the server to load its tools."
+            : "Loading tools…"}
+        </p>
+      ) : (
+        !data.tools?.length && <p>This server lists no tools.</p>
+      )}
+      {[
+        ...new Set([
+          ...selected,
+          ...(data?.tools ?? []).map((tool) => tool.name),
+        ]),
+      ].map((name) => {
+        const tool = data?.tools?.find((tool) => tool.name === name);
+        return (
+          <label className="checkbox" key={name} htmlFor={prefix + name}>
+            <Checkbox
+              id={prefix + name}
+              checked={selected.includes(name)}
+              onCheckedChange={(checked) =>
+                onChange(
+                  checked
+                    ? [...selected, name]
+                    : selected.filter((item) => item !== name),
+                )
+              }
+            />
+            {name} {tool?.readOnly && "(read-only)"} {tool?.description}
+          </label>
+        );
+      })}
+    </fieldset>
+  );
+}
 function JudgeMcpTools({
-  title,
+  resource,
   tools,
   onChange,
 }: {
-  title: string;
+  resource: Resource;
   tools: string[];
   onChange: (tools: string[]) => void;
 }) {
   // Keep the typed text so separators are not dropped while the user types.
   const [text, setText] = useState(tools.join(", "));
 
+  if (resource.url)
+    return (
+      <RemoteJudgeTools
+        resource={resource}
+        selected={tools}
+        onChange={onChange}
+      />
+    );
   return (
     <Input
       className="judge-mcp-tools"
-      aria-label={`Tools the judge may call from ${title}`}
+      aria-label={`Tools the judge may call from ${resource.title}`}
       placeholder="Allowed tools, comma separated (required)"
       value={text}
       onChange={(event) => {
@@ -152,7 +217,7 @@ export function ResourceSelection({
                 )}
                 {judgeMcp && checked && (
                   <JudgeMcpTools
-                    title={resource.title}
+                    resource={resource}
                     tools={value.judgeMcpTools[resource.id] ?? []}
                     onChange={(tools) =>
                       onChange({
