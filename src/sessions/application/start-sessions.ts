@@ -51,18 +51,36 @@ export class StartSessions implements OnModuleDestroy {
     private readonly analytics?: AnalyticsService,
   ) {}
 
-  async start(evalId: string) {
+  async start(
+    evalId: string,
+    selection?: { revision: number; models: number[] },
+  ) {
     const evaluation = await this.evals.find(evalId);
 
     if (!evaluation) throw new NotFoundException("Evaluation not found.");
 
     const data = evaluation.snapshot();
+    if (
+      selection &&
+      (selection.revision !== data.revision ||
+        !selection.models.length ||
+        selection.models.some(
+          (index) =>
+            !Number.isInteger(index) ||
+            index < 0 ||
+            index >= data.models.length,
+        ))
+    )
+      throw new Error("Reload the evaluation and select models for this run.");
+    const models = selection
+      ? data.models.filter((_, index) => selection.models.includes(index))
+      : data.models;
     this.queue.setConcurrency((await this.settings.get()).sessionConcurrency);
 
     // Validate the complete batch before creating records or spending provider credits.
     const catalog = await this.harnesses.catalog();
 
-    for (const settings of [...data.models, data.judge]) {
+    for (const settings of [...models, data.judge]) {
       const harness = catalog.find((entry) => entry.id === settings.harness);
 
       if (!harness?.installed)
@@ -122,7 +140,7 @@ export class StartSessions implements OnModuleDestroy {
     const created: Session[] = [];
 
     try {
-      for (const model of data.models) {
+      for (const model of models) {
         for (let index = 0; index < model.count; index++) {
           const session = new Session(data, model);
 

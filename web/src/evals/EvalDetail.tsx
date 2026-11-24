@@ -44,13 +44,21 @@ export function EvalDetail({ id }: { id: string }) {
   const [batch, setBatch] = useState("latest");
   const [message, setMessage] = useState("");
 
+  const [selection, setSelection] = useState<number[] | null>(null);
   async function run() {
     setStarting(true);
     setRunError("");
     setMessage("");
 
     try {
-      await api(`/evals/${id}/run`, { method: "POST" });
+      await api(`/evals/${id}/run`, {
+        method: "POST",
+        ...(selection && {
+          body: JSON.stringify({
+            selection: { revision: evaluation?.revision, models: selection },
+          }),
+        }),
+      });
       setBatch("latest");
       setMessage("Run created. Results update here as sessions finish.");
       refresh();
@@ -75,7 +83,11 @@ export function EvalDetail({ id }: { id: string }) {
     (session) => isActive(session) && session.batchId !== sessions[0]?.batchId,
   );
   const running = (allSessions ?? []).some(isActive);
-  const count = evaluation.models.reduce((sum, model) => sum + model.count, 0);
+  const count = evaluation.models.reduce(
+    (sum, model, index) =>
+      sum + (selection === null || selection.includes(index) ? model.count : 0),
+    0,
+  );
   const models = [
     ...new Set(
       (sessions ?? []).map((session) => `${session.harness}/${session.model}`),
@@ -93,7 +105,7 @@ export function EvalDetail({ id }: { id: string }) {
         <Button
           type="button"
           variant="primary"
-          disabled={starting}
+          disabled={starting || count === 0}
           onClick={() => void run()}
         >
           {starting && <StatusIcon name="spinner" />}
@@ -102,6 +114,37 @@ export function EvalDetail({ id }: { id: string }) {
             : `Run ${count} ${running ? "more " : ""}${count === 1 ? "session" : "sessions"}`}
         </Button>
       </PageTitle>
+      {evaluation.models.length > 1 && (
+        <details className="section-note">
+          <summary>Select models for this run</summary>
+          <fieldset disabled={starting}>
+            <legend>Session models</legend>
+            {evaluation.models.map((config, index) => (
+              <label
+                className="checkbox"
+                key={`${config.harness}/${config.model}/${index}`}
+              >
+                <input
+                  type="checkbox"
+                  checked={selection === null || selection.includes(index)}
+                  onChange={(event) => {
+                    const current =
+                      selection ?? evaluation.models.map((_, i) => i);
+                    setSelection(
+                      event.target.checked
+                        ? [...current, index]
+                        : current.filter((i) => i !== index),
+                    );
+                  }}
+                />
+                <ModelKey value={`${config.harness}/${config.model}`} /> ·{" "}
+                {config.effort} · {config.count}{" "}
+                {config.count === 1 ? "session" : "sessions"}
+              </label>
+            ))}
+          </fieldset>
+        </details>
+      )}
       <Notice error={runError || (allSessions ? sessionsError : undefined)} />
       <Feedback message={message} />
       {starting && (
