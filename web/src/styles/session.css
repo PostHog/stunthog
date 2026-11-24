@@ -78,6 +78,43 @@
   margin: 0;
   font-size: 14px;
 }
+.session-drift {
+  padding: 12px 0;
+  border-top: 1px solid var(--border);
+}
+.session-drift ul {
+  list-style: disc;
+  padding-inline-start: 18px;
+}
+.session-drift li {
+  overflow-wrap: anywhere;
+}
+.session-drift li + li {
+  margin-top: 12px;
+}
+.session-drift li::marker {
+  color: var(--muted-foreground);
+}
+.session-drift li {
+  overflow-wrap: anywhere;
+}
+.drift-trace-link {
+  margin-inline-start: 8px;
+  color: var(--info-foreground);
+  text-decoration: underline;
+  cursor: pointer;
+}
+.session-drift li code,
+.session-drift li small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted-foreground);
+}
+.session-drift p {
+  margin: 6px 0 0;
+}
 .judgment {
   background: var(--card);
   padding: 16px;

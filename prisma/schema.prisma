@@ -149,6 +149,7 @@ model Session {
   snapshot       Json
   agentResult    Json?
   judgeResult    Json?
+  behaviorDrift  Json?
   verdict        String?
   error          String?
   inputTokens    Int?

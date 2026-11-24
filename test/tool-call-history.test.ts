@@ -80,6 +80,11 @@ test("previous sessions and live tool events share a durable, searchable call hi
       (await db.eval.findUniqueOrThrow({ where: { id } })).responseOverrides,
       [],
     );
+    assert.equal(
+      (await db.session.findUniqueOrThrow({ where: { id: session } }))
+        .behaviorDrift,
+      null,
+    );
     const history = new ToolCallsController(db);
     const found = await history.search({
       query: "analyti",

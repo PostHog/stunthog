@@ -108,6 +108,8 @@ In an agent session, expand a tool result and select **Intercept**. Choose how S
 
 Set `TYPESAFE_API_KEY` for Jev and `OPENROUTER_API_KEY` for LLM editing, or save the keys in **API keys**. Expand **Result** in the trace to see the match probability, the edit rationale, and the response diff. If a provider request fails, the agent receives the original response.
 
+After the session, open **Model behavior drift** to see how the agent responded to each edit. Select a trace link to inspect the original and modified responses.
+
 ## Harnesses
 
 | Harness | Model catalog | Key | Requirement |
