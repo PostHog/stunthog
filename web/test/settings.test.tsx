@@ -147,6 +147,9 @@ test("saved model and judge defaults prefill new evaluations without changing ex
   );
   assert.equal(settings.evaluationDefaults.models.length, 1);
   newEval.unmount();
+  const restoredDraft = render(<EvalEditor />);
+  await screen.findByText("No models selected");
+  restoredDraft.unmount();
 
   const editEval = render(<EvalEditor id={existing.id} />);
   await screen.findByDisplayValue("Existing evaluation");
