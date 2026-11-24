@@ -17,6 +17,7 @@ export function filterSessions(
   query: string,
   model: string,
   status: string,
+  displayName: (harness: string, model: string) => string = (_, model) => model,
 ) {
   const search = query.trim().toLowerCase();
 
@@ -29,7 +30,7 @@ export function filterSessions(
           : status === "review"
             ? needsReview(session)
             : session.status === status)) &&
-      `${session.eval.title} ${session.model} ${session.harness} ${session.snapshot.environment?.title ?? ""}`
+      `${session.eval.title} ${displayName(session.harness, session.model)} ${session.model} ${session.harness} ${session.snapshot.environment?.title ?? ""}`
         .toLowerCase()
         .includes(search),
   );

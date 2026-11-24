@@ -127,3 +127,11 @@ test("session search combines model, status, and case-insensitive environment fi
   assert.equal(filterSessions(sessions, "", "", "cancelled").length, 1);
   assert.equal(filterSessions(sessions, "missing", "", "").length, 0);
 });
+
+test("search includes model catalog labels", () => {
+  const row = session("completed");
+  assert.deepEqual(
+    filterSessions([row], "qwen3.8 flash", "", "", () => "Qwen: Qwen3.8 Flash"),
+    [row],
+  );
+});
