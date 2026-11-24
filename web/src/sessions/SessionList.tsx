@@ -236,7 +236,7 @@ function ResultTable({ filtered }: { filtered: Summary[] }) {
   );
 }
 
-function useFilters(rememberFilters=false) {
+function useFilters(rememberFilters = false) {
   const saved = new URLSearchParams(
     rememberFilters ? location.hash.split("?")[1] : "",
   );
@@ -266,7 +266,7 @@ function NoSessions() {
 
 export function SessionsTable({ sessions }: { sessions: Session[] }) {
   const filters = useFilters();
-  const displayName=useModelName();
+  const displayName = useModelName();
   const filtered = filterSessions(
     sessions,
     filters.search,
@@ -295,7 +295,7 @@ export function SessionsTable({ sessions }: { sessions: Session[] }) {
 }
 
 function HistoryTable({ sessions }: { sessions: HistoryIndex[] }) {
-  const displayName=useModelName();
+  const displayName = useModelName();
   const filters = useFilters(true);
   const [offset, setOffset] = useState(0);
   const query = filters.search.trim().toLowerCase();
@@ -312,7 +312,7 @@ function HistoryTable({ sessions }: { sessions: HistoryIndex[] }) {
         row.title,
         row.environment,
         row.model,
-        displayName(row.harness,row.model),
+        displayName(row.harness, row.model),
         row.harness,
       ].some((x) => x?.toLowerCase().includes(query)),
   );
