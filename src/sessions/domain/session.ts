@@ -46,10 +46,11 @@ export class Session {
     this.failure = failure;
   }
 
-  complete(input: unknown): void {
+  complete(input: unknown, interceptedIds: string[] = []): void {
     const judgment = parseJudgment(
       input,
       this.configuration.criteria.map((criterion) => criterion.id),
+      interceptedIds,
     );
 
     // Judge completion must not hide a failed agent execution.

@@ -3,6 +3,17 @@ import { z } from "zod";
 const judgmentSchema = z
   .object({
     summary: z.string().trim().min(1),
+    behaviorDrift: z
+      .array(
+        z
+          .object({
+            callId: z.string().min(1),
+            outcome: z.enum(["observed", "no_observed_effect", "uncertain"]),
+            explanation: z.string().trim().min(1),
+          })
+          .strict(),
+      )
+      .optional(),
     decisions: z.array(
       z
         .object({
@@ -16,10 +27,12 @@ const judgmentSchema = z
   .strict();
 
 export type Judgment = z.infer<typeof judgmentSchema>;
+export type DriftFinding = NonNullable<Judgment["behaviorDrift"]>[number];
 
 export function parseJudgment(
   input: unknown,
   criterionIds: string[],
+  interceptedIds: string[] = [],
 ): Judgment {
   const parsed = judgmentSchema.safeParse(input);
 
@@ -45,5 +58,16 @@ export function parseJudgment(
       "The judge must assess every session criterion exactly once.",
     );
 
+  const outstanding = new Set(interceptedIds);
+  for (const finding of parsed.data.behaviorDrift ?? []) {
+    if (!outstanding.delete(finding.callId))
+      throw new Error(
+        "The judge returned an unknown or repeated intercepted call ID.",
+      );
+  }
+  if (outstanding.size)
+    throw new Error(
+      "The judge must assess every intercepted call exactly once.",
+    );
   return parsed.data;
 }

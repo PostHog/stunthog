@@ -2,6 +2,7 @@ import type { EvaluationData } from "../../src/evaluations/domain/evaluation.js"
 import type { ModelSettingsData } from "../../src/evaluations/domain/model-settings.js";
 import type { HarnessResult } from "../../src/harnesses/domain/harness.js";
 import type { ExecutionSnapshot } from "../../src/sessions/domain/execution-snapshot.js";
+import type { DriftFinding } from "../../src/sessions/domain/judgment.js";
 
 export type { EvaluationData, ModelSettingsData };
 export type EvalDraft = Omit<EvaluationData, "id" | "revision" | "judge"> & {
@@ -51,6 +52,7 @@ export interface Decision {
   feedback: string;
 }
 export interface Session {
+  behaviorDrift?: DriftFinding[] | null;
   interceptedCalls: number;
   id: string;
   evalId: string;

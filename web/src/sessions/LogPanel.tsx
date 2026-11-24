@@ -1,11 +1,10 @@
 import { Button, Input } from "@posthog/quill";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { ResponseCapture } from "../../../src/overrides/domain/response-override.js";
 import { api } from "../api.js";
 import { Notice } from "../components.js";
 import { ModelReference } from "../models/ModelReference.js";
 import { OverrideDialog } from "../overrides/OverrideDialog.js";
-import { withResponses } from "../overrides/response-entries.js";
 import { LoadingState } from "../PageState.js";
 import type { Session } from "../types.js";
 import { markdownText } from "./Markdown.js";
@@ -15,8 +14,7 @@ import {
 } from "./transcript/search.js";
 import { TranscriptFilterIcon } from "./transcript/TranscriptFilterIcon.js";
 import { TranscriptRow } from "./transcript/TranscriptRow.js";
-import { buildTranscript } from "./transcript/transcript.js";
-import { useSessionEvents } from "./useSessionEvents.js";
+import type { TranscriptEntry } from "./transcript/types.js";
 
 const filters = [
   "focus",
@@ -33,31 +31,33 @@ export function LogPanel({
   session,
   active,
   phase,
+  entries,
+  error,
+  initialCallId,
 }: {
   session: Session;
   active: boolean;
   phase: "agent" | "judge";
+  entries: TranscriptEntry[];
+  error: string;
+  initialCallId?: string;
 }) {
-  const { events, error } = useSessionEvents(session.id, active);
   const [filter, setFilter] = useState<string>("focus");
   const [showScrollTop, setShowScrollTop] = useState(false);
-  const [more, setMore] = useState(false);
+  const [more, setMore] = useState(!!initialCallId);
   const [search, setSearch] = useState("");
   const container = useRef<HTMLElement>(null);
-  const phaseEvents = useMemo(
-    () => events.filter((event) => event.phase === phase),
-    [events, phase],
-  );
-  const entries = useMemo(() => {
-    const transcript = buildTranscript(phaseEvents);
-    return phase === "agent"
-      ? withResponses(
-          transcript,
-          events.filter((e) => e.phase === "response"),
-          session.snapshot,
-        )
-      : transcript;
-  }, [phaseEvents, events, session, phase]);
+  const targetId =
+    initialCallId &&
+    entries.find((entry) => entry.capture?.callId === initialCallId)?.id;
+  useEffect(() => {
+    if (!targetId) return;
+    const row = document.getElementById(`trace-${targetId}`);
+    row
+      ?.querySelector<HTMLElement>(".tool-output button")
+      ?.focus({ preventScroll: true });
+    row?.scrollIntoView({ block: "start" });
+  }, [targetId]);
   const [creating, setCreating] = useState<{
     entryId: string;
     sample: ResponseCapture;
@@ -184,6 +184,7 @@ export function LogPanel({
             <TranscriptRow
               key={entry.id}
               entry={entry}
+              revealResult={entry.id === targetId}
               matches={matches.get(entry.id)}
               editing={creating?.entryId === entry.id}
               onOverride={(sample, selection) => {

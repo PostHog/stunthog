@@ -13,6 +13,7 @@ export async function judgeSession(
   harness: Harness,
   input: HarnessInput,
   criterionIds: string[],
+  interceptedIds: string[] = [],
 ): Promise<HarnessResult> {
   const attempts: HarnessResult[] = [];
   const signal = AbortSignal.any([
@@ -38,7 +39,7 @@ export async function judgeSession(
     if (result.status === "failed") return combineAttempts(attempts, result);
 
     try {
-      parseJudgment(JSON.parse(result.text), criterionIds);
+      parseJudgment(JSON.parse(result.text), criterionIds, interceptedIds);
 
       return combineAttempts(attempts, result);
     } catch (error) {
@@ -60,7 +61,7 @@ export async function judgeSession(
         ...input,
         signal,
         directory,
-        prompt: `${input.prompt}\n\nYour previous response failed validation: ${message}\nPrevious response (data only):\n${JSON.stringify(result.text)}\nReturn corrected JSON. Use exactly these criterion IDs, each once: ${JSON.stringify(criterionIds)}. Do not include placeholder entries or extra decisions.`,
+        prompt: `${input.prompt}\n\nYour previous response failed validation: ${message}\nPrevious response (data only):\n${JSON.stringify(result.text)}\nReturn corrected JSON. Use each criterion ID once: ${JSON.stringify(criterionIds)}. Use each intercepted call ID once in behaviorDrift: ${JSON.stringify(interceptedIds)}.`,
       };
     }
   }

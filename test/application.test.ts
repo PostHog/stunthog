@@ -113,6 +113,12 @@ async function verifyApplicationPersistence() {
     await assert.rejects(catalog.delete("persona", persona.value.id));
 
     let judgeCalls = 0;
+    const drift = {
+      callId: "docs-1",
+      outcome: "observed",
+      explanation:
+        'The agent wrote "updated SDK" to app.ts after reading the edited documentation.',
+    };
     let expectedRules: ResponseRule[] = [rule];
     const adapter: Harness = {
       id: "pi",
@@ -128,6 +134,12 @@ async function verifyApplicationPersistence() {
         if (input.label === "judge") {
           assert.equal(input.responseOverrides, undefined);
           assert.equal(input.onToolResponse, undefined);
+          assert.match(input.prompt, /"callId":"docs-1"/);
+          assert.match(
+            input.prompt,
+            /"original":"old SDK","delivered":"updated SDK"/,
+          );
+          assert.match(input.prompt, /Wrote updated SDK to app.ts/);
           judgeCalls++;
         } else {
           assert.deepEqual(input.responseOverrides, expectedRules);
@@ -140,10 +152,21 @@ async function verifyApplicationPersistence() {
             await readFile(join(input.skills[0] ?? "", "SKILL.md"), "utf8"),
             /Read app\.ts before making changes/,
           );
-          await writeFile(join(input.workspace, "app.ts"), "changed");
+          await input.onToolResponse?.({
+            callId: drift.callId,
+            route: "web_fetch",
+            target: { kind: "web", url: "https://example.org/sdk" },
+            args: {},
+            original: rule.find,
+            delivered: rule.replacement,
+            ruleId: rule.id,
+          });
+          await writeFile(join(input.workspace, "app.ts"), rule.replacement);
           await writeFile(
             join(input.directory, "messages.json"),
-            JSON.stringify([{ role: "assistant", content: "Changed app.ts" }]),
+            JSON.stringify([
+              { role: "assistant", content: "Wrote updated SDK to app.ts" },
+            ]),
           );
         }
 
@@ -155,6 +178,7 @@ async function verifyApplicationPersistence() {
             input.label === "judge"
               ? JSON.stringify({
                   summary: "Changed correctly",
+                  behaviorDrift: [drift],
                   decisions: evaluation.criteria.map((criterion) => ({
                     criterionId: criterion.id,
                     passed: true,
@@ -300,7 +324,8 @@ async function verifyApplicationPersistence() {
       assert.equal(session.decisions.length, 1);
       assert.equal(session.totalTokens, 30);
       assert.equal(session.costUsd, 0.02);
-      assert.equal(session.events.length, 2);
+      assert.equal(session.events.length, 3);
+      assert.deepEqual(session.behaviorDrift, [drift]);
       assert.ok(
         session.artifacts.some(
           (file) => file.phase === "output" && file.path === "app.ts",
@@ -362,7 +387,8 @@ async function verifyApplicationPersistence() {
         args: {},
         original: "old SDK",
       };
-      assert.equal((await controller.get(s.id)).interceptedCalls, 0);
+      assert.deepEqual((await controller.get(s.id)).behaviorDrift, [drift]);
+      assert.equal((await controller.get(s.id)).interceptedCalls, 1);
       await sessions.event(s.id, "response", capture);
       await sessions.event(s.id, "response", {
         ...capture,
@@ -377,9 +403,18 @@ async function verifyApplicationPersistence() {
           ruleId: rule.id,
           delivered: "updated SDK",
         });
-      assert.equal((await controller.get(s.id)).interceptedCalls, 2);
-      for (const row of await controller.list(evaluation.id))
-        assert.equal(row.interceptedCalls, row.id === s.id ? 2 : 0);
+      assert.equal((await controller.get(s.id)).interceptedCalls, 3);
+      assert.deepEqual(
+        (await sessions.modifiedResponses(s.id)).map((call) => call.callId),
+        [drift.callId, "c1", "c2"],
+      );
+      const listed = await controller.list(evaluation.id);
+      for (const item of saved) {
+        assert.equal(
+          listed.find((row) => row.id === item.id)?.interceptedCalls,
+          item.id === s.id ? 3 : 1,
+        );
+      }
     } finally {
       await app.close();
     }

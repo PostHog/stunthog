@@ -2,6 +2,7 @@ import { Inject, Injectable } from "@nestjs/common";
 import type { Prisma } from "@prisma/client";
 import type { HarnessResult } from "../../harnesses/domain/harness.js";
 import { Database } from "../../infrastructure/database.js";
+import type { ResponseCapture } from "../../overrides/domain/response-override.js";
 import type { ExecutionSnapshot } from "../domain/execution-snapshot.js";
 import type { Session } from "../domain/session.js";
 import { SessionRepository } from "../domain/session-repository.js";
@@ -93,6 +94,7 @@ export class PrismaSessionRepository extends SessionRepository {
         ...(data.judgment
           ? {
               verdict: data.judgment.summary,
+              behaviorDrift: json(data.judgment.behaviorDrift ?? []),
               decisions: {
                 deleteMany: {},
                 create: data.judgment.decisions.map((decision) => ({
@@ -144,5 +146,19 @@ export class PrismaSessionRepository extends SessionRepository {
     });
 
     return events.map((entry) => entry.event);
+  }
+
+  async modifiedResponses(sessionId: string): Promise<ResponseCapture[]> {
+    const rows = await this.db.$queryRaw<{ capture: string }[]>`
+      SELECT CAST(event AS TEXT) AS capture FROM SessionEvent
+      WHERE sessionId = ${sessionId} AND phase = 'response'
+        AND json_type(event, '$.ruleId') = 'text'
+        AND json_type(event, '$.delivered') IS NOT NULL ORDER BY sequence`;
+    const calls = new Map<string, ResponseCapture>();
+    for (const row of rows) {
+      const capture: ResponseCapture = JSON.parse(row.capture);
+      calls.set(capture.callId, capture);
+    }
+    return [...calls.values()];
   }
 }

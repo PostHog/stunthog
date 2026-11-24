@@ -5,11 +5,12 @@ import {
   TabsList,
   TabsTrigger,
 } from "@posthog/quill";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { api, useApi } from "../api.js";
 import { Notice, PageTitle, Status } from "../components.js";
 import { ModelReference } from "../models/ModelReference.js";
 import { ResponseOverrideList } from "../overrides/ResponseOverrideList.js";
+import { withResponses } from "../overrides/response-entries.js";
 import { RequestState } from "../PageState.js";
 import { ResourceIcon } from "../resources/ResourceIcon.js";
 import { StatusIcon } from "../status/StatusIcon.js";
@@ -17,10 +18,13 @@ import type { Session } from "../types.js";
 import { ConfigurationPanel } from "./ConfigurationPanel.js";
 import { FilesPanel } from "./FilesPanel.js";
 import { LogPanel } from "./LogPanel.js";
+import { ModelBehaviorDrift } from "./ModelBehaviorDrift.js";
 import { SessionJudgment } from "./SessionJudgment.js";
 import { SessionMetadata } from "./SessionMetadata.js";
 import { isActive } from "./session-filters.js";
 import { TranscriptFilterIcon } from "./transcript/TranscriptFilterIcon.js";
+import { buildTranscript } from "./transcript/transcript.js";
+import { useSessionEvents } from "./useSessionEvents.js";
 
 export function SessionDetail({ id }: { id: string }) {
   const {
@@ -31,6 +35,28 @@ export function SessionDetail({ id }: { id: string }) {
   const [tab, setTab] = useState("agent");
   const [failure, setFailure] = useState("");
   const [cancelling, setCancelling] = useState(false);
+  const [jump, setJump] = useState({ callId: "", visit: 0 });
+  const active = !!session && isActive(session);
+  const { events, error: traceError } = useSessionEvents(id, active);
+  const snapshot = session?.snapshot;
+  const agentEntries = useMemo(
+    () =>
+      snapshot
+        ? withResponses(
+            buildTranscript(events.filter((event) => event.phase === "agent")),
+            events.filter((event) => event.phase === "response"),
+            snapshot,
+          )
+        : [],
+    [events, snapshot],
+  );
+  const judgeEntries = useMemo(
+    () =>
+      tab === "judge"
+        ? buildTranscript(events.filter((event) => event.phase === "judge"))
+        : [],
+    [events, tab],
+  );
 
   async function cancel() {
     if (
@@ -54,8 +80,6 @@ export function SessionDetail({ id }: { id: string }) {
   }
 
   if (!session) return <RequestState error={error} retry={refresh} />;
-
-  const active = isActive(session);
 
   return (
     <div className="session-detail">
@@ -103,10 +127,24 @@ export function SessionDetail({ id }: { id: string }) {
               </TabsTrigger>
             </TabsList>
             <TabsContent value="agent" className="session-log-view">
-              <LogPanel session={session} active={active} phase="agent" />
+              <LogPanel
+                key={jump.visit}
+                session={session}
+                active={active}
+                phase="agent"
+                entries={agentEntries}
+                error={traceError}
+                initialCallId={jump.callId}
+              />
             </TabsContent>
             <TabsContent value="judge" className="session-log-view">
-              <LogPanel session={session} active={active} phase="judge" />
+              <LogPanel
+                session={session}
+                active={active}
+                phase="judge"
+                entries={judgeEntries}
+                error={traceError}
+              />
             </TabsContent>
             <TabsContent value="files">
               <FilesPanel id={id} active={active} />
@@ -124,6 +162,14 @@ export function SessionDetail({ id }: { id: string }) {
         >
           <h2>Session details</h2>
           <SessionMetadata session={session} />
+          <ModelBehaviorDrift
+            session={session}
+            entries={agentEntries}
+            onInspect={(callId) => {
+              setJump((current) => ({ callId, visit: current.visit + 1 }));
+              setTab("agent");
+            }}
+          />
           <ResponseOverrideList
             rules={session.snapshot.evaluation.responseOverrides}
             servers={session.snapshot.mcps}

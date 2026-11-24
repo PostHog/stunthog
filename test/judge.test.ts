@@ -40,6 +40,31 @@ test("judgments reject extra, missing, duplicate, and unknown criterion IDs", ()
     );
 });
 
+test("drift findings must identify every edited call exactly once", () => {
+  const finding = {
+    callId: "first",
+    outcome: "uncertain",
+    explanation: "The session ended after this call.",
+  };
+  const other = { ...finding, callId: "second", outcome: "no_observed_effect" };
+  const ids = ["first", "second"];
+  const parse = (behaviorDrift?: unknown[]) =>
+    parseJudgment({ ...valid, behaviorDrift }, [criterion.id], ids);
+  assert.deepEqual(parse([other, finding]).behaviorDrift, [other, finding]);
+  for (const invalid of [
+    undefined,
+    [finding],
+    [other, other],
+    [other, { ...finding, callId: "invented" }],
+    [finding, { ...other, explanation: " " }],
+  ]) {
+    assert.throws(() => parse(invalid));
+  }
+  assert.throws(() =>
+    parseJudgment({ ...valid, behaviorDrift: [finding] }, [criterion.id]),
+  );
+});
+
 test("judge retries malformed reports once, retains evidence, and counts both attempts", async () => {
   const f = await fixture();
   const settings = ModelSettings.create({ model: "test" }).value;

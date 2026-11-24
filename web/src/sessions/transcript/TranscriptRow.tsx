@@ -39,10 +39,12 @@ export function TranscriptRow({
   matches,
   onOverride,
   editing = false,
+  revealResult = false,
   children,
 }: {
   entry: TranscriptEntry;
   editing?: boolean;
+  revealResult?: boolean;
   children?: ReactNode;
   onOverride?: (capture: ResponseCapture, selection: string) => void;
   matches?: TranscriptMatches | undefined;
@@ -55,7 +57,7 @@ export function TranscriptRow({
     <article
       className={`transcript-row transcript-${entry.kind}`}
       data-modified={modified ? true : undefined}
-      id={`event-${entry.sequence}`}
+      id={`trace-${entry.id}`}
     >
       <span className="transcript-sequence">{entry.sequence}</span>
       {tool ? (
@@ -120,7 +122,7 @@ export function TranscriptRow({
             <Collapsible
               className="tool-output"
               key={matches?.output ? "match" : "idle"}
-              defaultOpen={Boolean(matches?.output)}
+              defaultOpen={revealResult || Boolean(matches?.output)}
             >
               <CollapsibleTrigger>
                 <span className={`tool-result-status ${entry.status}`}>

@@ -133,13 +133,18 @@ export class SessionWorker {
       );
       await this.sessions.save(session, agent);
 
-      const evidence =
+      const piMessages =
         adapter.id === "pi"
           ? await readFile(join(root, "agent", "messages.json"), "utf8").catch(
-              () => "[]",
+              () => undefined,
             )
-          : JSON.stringify(await this.sessions.events(session.id, "agent"));
+          : undefined;
+      const evidence =
+        piMessages ??
+        JSON.stringify(await this.sessions.events(session.id, "agent"));
       const judgeWorkspace = join(root, "judge-workspace");
+      const intercepts = await this.sessions.modifiedResponses(session.id);
+      const interceptedIds = intercepts.map((call) => call.callId);
 
       judgeRuntime = await this.runtimes.create(
         null,
@@ -154,7 +159,7 @@ export class SessionWorker {
         root,
         judgeWorkspace,
         [],
-        judgingPrompt(snapshot, agent, evidence),
+        judgingPrompt(snapshot, agent, evidence, intercepts),
         snapshot,
         signal,
         "judge",
@@ -175,6 +180,7 @@ export class SessionWorker {
           : judgeHarness,
         judgeInput,
         snapshot.evaluation.criteria.map((criterion) => criterion.id),
+        interceptedIds,
       );
 
       await this.artifacts.capture(
@@ -190,7 +196,7 @@ export class SessionWorker {
       judgeRuntime = undefined;
 
       signal.throwIfAborted();
-      session.complete(JSON.parse(judge.text));
+      session.complete(JSON.parse(judge.text), interceptedIds);
       await this.sessions.save(session, agent, judge);
     } catch (error) {
       this.analytics?.exception(error, "session_execute");
