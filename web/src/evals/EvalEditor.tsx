@@ -47,6 +47,8 @@ function ExistingEditor({ id }: { id: string }) {
   );
 }
 
+// Drafts belong to this tab and the revision the author opened.
+const drafts = new Map<string, EvalDraft>();
 function Editor({
   initial,
   defaults,
@@ -54,21 +56,24 @@ function Editor({
   initial?: EvaluationData;
   defaults?: EvaluationDefaultsData;
 }) {
-  const [value, setValue] = useState<EvalDraft>(
-    initial ?? {
-      title: "",
-      prompt: "",
-      criteria: [],
-      environmentId: null,
-      personaId: null,
-      skillIds: [],
-      mcpIds: [],
-      judgeSkillIds: [],
-      judgeMcpIds: [],
-      judgeMcpTools: {},
-      models: defaults?.models ?? [],
-      judge: defaults?.judge ?? null,
-    },
+  const draftKey = initial ? `${initial.id}/${initial.revision}` : "new";
+  const [value, update] = useState<EvalDraft>(
+    () =>
+      drafts.get(draftKey) ??
+      initial ?? {
+        title: "",
+        prompt: "",
+        criteria: [],
+        environmentId: null,
+        personaId: null,
+        skillIds: [],
+        mcpIds: [],
+        judgeSkillIds: [],
+        judgeMcpIds: [],
+        judgeMcpTools: {},
+        models: defaults?.models ?? [],
+        judge: defaults?.judge ?? null,
+      },
   );
   const {
     data: resources,
@@ -81,6 +86,10 @@ function Editor({
     error: harnessError,
     refresh: refreshHarnesses,
   } = useApi<Harness[]>("/harnesses");
+  function setValue(next: EvalDraft) {
+    drafts.set(draftKey, next);
+    update(next);
+  }
   const judgeHarness = harnesses?.find(
     (harness) => harness.id === value.judge?.harness,
   );
@@ -143,6 +152,7 @@ function Editor({
         { method: initial ? "PUT" : "POST", body: JSON.stringify(input) },
       );
 
+      drafts.delete(draftKey);
       location.hash = `evals/${saved.id}`;
     } catch (error) {
       setError(String(error));
@@ -158,7 +168,12 @@ function Editor({
           nativeButton={false}
           variant="outline"
           render={
-            <a href={initial ? `#evals/${initial.id}` : "#evals"}>Cancel</a>
+            <a
+              onClick={() => drafts.delete(draftKey)}
+              href={initial ? `#evals/${initial.id}` : "#evals"}
+            >
+              Cancel
+            </a>
           }
         />
       </PageTitle>
