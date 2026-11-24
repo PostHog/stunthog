@@ -83,6 +83,16 @@ export function SessionMetadata({ session }: { session: Session }) {
       <div>
         <DetailLabel icon={IconReceipt}>Estimated USD</DetailLabel>
         <dd>{money(session.costUsd)}</dd>
+        {(
+          [
+            ["Agent", session.agentResult, session.model],
+            ["Judge", session.judgeResult, snapshot.evaluation.judge.model],
+          ] as const
+        ).map(([phase, result, model]) => (
+          <dd key={phase} className="muted">
+            {phase} · {model} · {money(result?.usage?.costUsd ?? null)}
+          </dd>
+        ))}
       </div>
       <div>
         <DetailLabel icon={IconListCheck}>Evaluation</DetailLabel>
