@@ -47,12 +47,16 @@ export class ResourcesController {
   }
 
   @Get(":id/connection")
-  async connection(@Param("id") id: string) {
+  async connection(@Param("id") id: string, @Query("tools") tools?: string) {
     const server = (await this.catalog.list()).mcps.find(
       (mcp) => mcp.id === id,
     );
     if (!server?.url) throw new Error("Select a saved remote MCP server.");
-    return inspectRemote(server.url, await this.oauth.accessToken(server.url));
+    return inspectRemote(
+      server.url,
+      await this.oauth.accessToken(server.url),
+      tools === "1",
+    );
   }
 
   @Post(":id/connect")
