@@ -10,6 +10,10 @@ const judgmentSchema = z
             callId: z.string().min(1),
             outcome: z.enum(["observed", "no_observed_effect", "uncertain"]),
             explanation: z.string().trim().min(1),
+            evidenceQuotes: z
+              .array(z.string().trim().min(4).max(600))
+              .max(6)
+              .optional(),
           })
           .strict(),
       )

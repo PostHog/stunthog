@@ -34,6 +34,7 @@ export function LogPanel({
   entries,
   error,
   initialCallId,
+  initialEntryId,
 }: {
   session: Session;
   active: boolean;
@@ -41,21 +42,26 @@ export function LogPanel({
   entries: TranscriptEntry[];
   error: string;
   initialCallId?: string;
+  initialEntryId?: string;
 }) {
   const [filter, setFilter] = useState<string>("focus");
   const [showScrollTop, setShowScrollTop] = useState(false);
-  const [more, setMore] = useState(!!initialCallId);
+  const [more, setMore] = useState(!!initialCallId || !!initialEntryId);
   const [search, setSearch] = useState("");
   const container = useRef<HTMLElement>(null);
   const targetId =
-    initialCallId &&
-    entries.find((entry) => entry.capture?.callId === initialCallId)?.id;
+    initialEntryId ||
+    (initialCallId &&
+      entries.find((entry) => entry.capture?.callId === initialCallId)?.id);
   useEffect(() => {
     if (!targetId) return;
     const row = document.getElementById(`trace-${targetId}`);
-    row
-      ?.querySelector<HTMLElement>(".tool-output button")
-      ?.focus({ preventScroll: true });
+    if (row) {
+      row.tabIndex = -1;
+      (row.querySelector<HTMLElement>(".tool-output button") ?? row).focus({
+        preventScroll: true,
+      });
+    }
     row?.scrollIntoView({ block: "start" });
   }, [targetId]);
   const [creating, setCreating] = useState<{

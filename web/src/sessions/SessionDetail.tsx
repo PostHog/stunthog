@@ -35,7 +35,7 @@ export function SessionDetail({ id }: { id: string }) {
   const [tab, setTab] = useState("agent");
   const [failure, setFailure] = useState("");
   const [cancelling, setCancelling] = useState(false);
-  const [jump, setJump] = useState({ callId: "", visit: 0 });
+  const [jump, setJump] = useState({ callId: "", entryId: "", visit: 0 });
   const active = !!session && isActive(session);
   const { events, error: traceError } = useSessionEvents(id, active);
   const snapshot = session?.snapshot;
@@ -135,6 +135,7 @@ export function SessionDetail({ id }: { id: string }) {
                 entries={agentEntries}
                 error={traceError}
                 initialCallId={jump.callId}
+                initialEntryId={jump.entryId}
               />
             </TabsContent>
             <TabsContent value="judge" className="session-log-view">
@@ -165,8 +166,20 @@ export function SessionDetail({ id }: { id: string }) {
           <ModelBehaviorDrift
             session={session}
             entries={agentEntries}
+            onEvidence={(entryId) => {
+              setJump((current) => ({
+                callId: "",
+                entryId,
+                visit: current.visit + 1,
+              }));
+              setTab("agent");
+            }}
             onInspect={(callId) => {
-              setJump((current) => ({ callId, visit: current.visit + 1 }));
+              setJump((current) => ({
+                callId,
+                entryId: "",
+                visit: current.visit + 1,
+              }));
               setTab("agent");
             }}
           />

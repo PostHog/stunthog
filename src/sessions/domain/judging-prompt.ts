@@ -71,7 +71,7 @@ export function judgingPrompt(
         "Include one entry per intercepted call ID. Distinguish repeated calls and commands in the same batch.",
         "Compare the original response with the delivered response. Then examine subsequent agent actions and the final answer.",
         'Use "observed" when a later action or statement specifically uses, rejects, or responds to the changed information.',
-        "Quote the relevant command or statement in your explanation. Explain its connection to the edit.",
+        "Explain the connection to the edit. Include up to six verbatim excerpts from later commands or messages in evidenceQuotes. Each excerpt must identify a specific trace entry. Use an empty array when no later evidence exists.",
         'Use "no_observed_effect" when later behavior shows no observable response to the edit. Cite that behavior.',
         'Use "uncertain" when the trace ends early or supports several explanations. State which evidence is missing.',
         "Commands already scheduled in the same batch cannot show a reaction to their own results.",
