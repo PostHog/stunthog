@@ -33,6 +33,15 @@ test("provider credits calculate the OpenRouter remaining balance", async () => 
   });
   assert.equal(credits[1]?.status, "unsupported");
   assert.equal(credits[2]?.status, "unsupported");
+  assert.deepEqual(
+    credits.find((c) => c.provider === "typesafe"),
+    {
+      provider: "typesafe",
+      status: "unsupported",
+      balanceUsd: null,
+      detail: "TypeSafe does not publish a credit balance through its API.",
+    },
+  );
 });
 
 test("provider credits explain when a balance endpoint is unavailable", async () => {
