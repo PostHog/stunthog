@@ -12,6 +12,8 @@ import { Inject, Injectable } from "@nestjs/common";
 import { KeyVault } from "../../credentials/key-vault.js";
 import { McpAuthorization } from "../application/mcp-authorization.js";
 
+export class McpReconnectRequired extends Error {}
+
 interface SavedOAuth {
   redirectUri: string;
   client?: OAuthClientInformationMixed;
@@ -90,7 +92,7 @@ export class McpOAuth extends McpAuthorization {
       return saved.tokens?.access_token;
 
     const reconnect = () => {
-      throw new Error("Reconnect the MCP server on the MCP servers page.");
+      throw new McpReconnectRequired("Reconnect the MCP server.");
     };
     if (!saved.tokens?.refresh_token) return reconnect();
 

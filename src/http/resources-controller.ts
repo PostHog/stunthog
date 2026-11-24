@@ -17,7 +17,10 @@ import { z } from "zod";
 import { Resource } from "../catalog/domain/resource.js";
 import { ResourceRepository } from "../catalog/domain/resource-repository.js";
 import { inspectRemote } from "../catalog/infrastructure/inspect-remote.js";
-import { McpOAuth } from "../catalog/infrastructure/mcp-oauth.js";
+import {
+  McpOAuth,
+  McpReconnectRequired,
+} from "../catalog/infrastructure/mcp-oauth.js";
 import { DEFAULT_DOCKERFILE } from "../sessions/domain/default-dockerfile.js";
 
 @Controller("api/resources")
@@ -52,7 +55,16 @@ export class ResourcesController {
       (mcp) => mcp.id === id,
     );
     if (!server?.url) throw new Error("Select a saved remote MCP server.");
-    return inspectRemote(server.url, await this.oauth.accessToken(server.url));
+    try {
+      return await inspectRemote(
+        server.url,
+        await this.oauth.accessToken(server.url),
+      );
+    } catch (error) {
+      if (error instanceof McpReconnectRequired)
+        return { status: "authorization" as const };
+      throw error;
+    }
   }
 
   @Post(":id/connect")
