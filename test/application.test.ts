@@ -440,6 +440,13 @@ async function verifyApplicationPersistence() {
         (await sessions.modifiedResponses(s.id)).map((call) => call.callId),
         [drift.callId, "c1", "c2"],
       );
+      const history = await controller.history();
+      assert.ok(history.some((row) => row.id === s.id));
+      const summaries = await controller.historyPage(s.id);
+      assert.equal(summaries.length, 1);
+      assert.equal(summaries[0]?.interceptedCalls, 3);
+      assert.deepEqual(summaries[0]?.criteria, evaluation.criteria);
+      assert.ok(!("agentResult" in (summaries[0] ?? {})));
       const listed = await controller.list(evaluation.id);
       for (const item of saved) {
         assert.equal(

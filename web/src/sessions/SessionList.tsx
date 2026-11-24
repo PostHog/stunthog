@@ -25,8 +25,37 @@ import { EmptyState, RequestState } from "../PageState.js";
 import type { Session } from "../types.js";
 import { filterSessions, isActive } from "./session-filters.js";
 
+type HistoryIndex = Pick<Session, "id" | "model" | "harness" | "status"> & {
+  title: string;
+  environment: string | null;
+  review: boolean;
+};
+type Summary = Pick<
+  Session,
+  | "id"
+  | "evalId"
+  | "model"
+  | "harness"
+  | "status"
+  | "createdAt"
+  | "durationMs"
+  | "costUsd"
+  | "verdict"
+  | "error"
+  | "eval"
+  | "interceptedCalls"
+> & {
+  criteria: Session["snapshot"]["evaluation"]["criteria"];
+  decisions: Pick<
+    Session["decisions"][number],
+    "passed" | "criterionSnapshotId"
+  >[];
+};
 export function SessionList() {
-  const { data, error, refresh } = useApi<Session[]>("/sessions", true);
+  const { data, error, refresh } = useApi<HistoryIndex[]>(
+    "/sessions/history",
+    true,
+  );
 
   return (
     <>
@@ -37,7 +66,7 @@ export function SessionList() {
       {data ? (
         <>
           <Notice error={error} />
-          <SessionsTable sessions={data} rememberFilters />
+          <HistoryTable sessions={data} />
         </>
       ) : (
         <RequestState error={error} retry={refresh} />
@@ -46,53 +75,30 @@ export function SessionList() {
   );
 }
 
-export function SessionsTable({
-  sessions,
-  rememberFilters = false,
+function TableControls({
+  search,
+  model,
+  status,
+  setSearch,
+  setModel,
+  setStatus,
+  models,
+  count,
+  total,
 }: {
-  sessions: Session[];
-  rememberFilters?: boolean;
+  search: string;
+  model: string;
+  status: string;
+  setSearch: (s: string) => void;
+  setModel: (s: string) => void;
+  setStatus: (s: string) => void;
+  models: string[];
+  count: number;
+  total: number;
 }) {
-  const saved = new URLSearchParams(
-    rememberFilters ? location.hash.split("?")[1] : "",
-  );
-  const [model, setModel] = useState(() => saved.get("model") ?? "");
-  const [status, setStatus] = useState(() => saved.get("status") ?? "");
-  const [search, setSearch] = useState(() => saved.get("q") ?? "");
-  useEffect(() => {
-    if (!rememberFilters) return;
-    const query = new URLSearchParams();
-    for (const [key, value] of Object.entries({ model, status, q: search }))
-      if (value) query.set(key, value);
-    history.replaceState(
-      history.state,
-      "",
-      query.size ? `#sessions?${query}` : "#sessions",
-    );
-  }, [rememberFilters, model, status, search]);
-  const models = [
-    ...new Set(
-      sessions.map((session) => `${session.harness}/${session.model}`),
-    ),
-  ];
-  const displayName = useModelName();
-  const filtered = filterSessions(sessions, search, model, status, displayName);
-
-  function clear() {
-    setModel("");
-    setStatus("");
-    setSearch("");
-  }
-
-  if (sessions.length === 0)
-    return (
-      <EmptyState title="No sessions yet">
-        <p>Run an evaluation to compare models and inspect their work here.</p>
-      </EmptyState>
-    );
-
   return (
     <>
+      {" "}
       <div className="session-list-filters">
         <Field label="Search sessions">
           <Input
@@ -129,14 +135,30 @@ export function SessionsTable({
       </div>
       <div className="session-list-summary">
         <output className="muted">
-          {filtered.length} of {sessions.length} sessions
+          {count} of {total} sessions
         </output>
         {(search || model || status) && (
-          <Button type="button" variant="outline" onClick={clear}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => {
+              setModel("");
+              setStatus("");
+              setSearch("");
+            }}
+          >
             Clear filters
           </Button>
         )}
       </div>
+    </>
+  );
+}
+
+function ResultTable({ filtered }: { filtered: Summary[] }) {
+  return (
+    <>
+      {" "}
       {filtered.length > 0 && (
         <div className="table-scroll">
           <Table fullWidth size="sm">
@@ -178,7 +200,7 @@ export function SessionsTable({
                   <TableCell>
                     <CheckBar
                       decisions={session.decisions}
-                      criteria={session.snapshot.evaluation.criteria}
+                      criteria={session.criteria}
                     />
                   </TableCell>
                   <TableCell className="verdict-preview">
@@ -207,9 +229,161 @@ export function SessionsTable({
           </Table>
         </div>
       )}
-      {filtered.length === 0 && (
+      {!filtered.length && (
         <EmptyState title="No sessions match these filters">{null}</EmptyState>
       )}
     </>
+  );
+}
+
+function useFilters(rememberFilters = false) {
+  const saved = new URLSearchParams(
+    rememberFilters ? location.hash.split("?")[1] : "",
+  );
+  const [model, setModel] = useState(() => saved.get("model") ?? "");
+  const [status, setStatus] = useState(() => saved.get("status") ?? "");
+  const [search, setSearch] = useState(() => saved.get("q") ?? "");
+  useEffect(() => {
+    if (!rememberFilters) return;
+    const query = new URLSearchParams();
+    for (const [key, value] of Object.entries({ model, status, q: search }))
+      if (value) query.set(key, value);
+    history.replaceState(
+      history.state,
+      "",
+      query.size ? `#sessions?${query}` : "#sessions",
+    );
+  }, [rememberFilters, model, status, search]);
+  return { model, status, search, setModel, setStatus, setSearch };
+}
+function NoSessions() {
+  return (
+    <EmptyState title="No sessions yet">
+      <p>Run an evaluation to compare models and inspect their work here.</p>
+    </EmptyState>
+  );
+}
+
+export function SessionsTable({ sessions }: { sessions: Session[] }) {
+  const filters = useFilters();
+  const displayName = useModelName();
+  const filtered = filterSessions(
+    sessions,
+    filters.search,
+    filters.model,
+    filters.status,
+    displayName,
+  );
+  return sessions.length ? (
+    <>
+      <TableControls
+        {...filters}
+        models={[...new Set(sessions.map((s) => s.harness + "/" + s.model))]}
+        count={filtered.length}
+        total={sessions.length}
+      />
+      <ResultTable
+        filtered={filtered.map((row) => ({
+          ...row,
+          criteria: row.snapshot.evaluation.criteria,
+        }))}
+      />
+    </>
+  ) : (
+    <NoSessions />
+  );
+}
+
+function HistoryTable({ sessions }: { sessions: HistoryIndex[] }) {
+  const displayName = useModelName();
+  const filters = useFilters(true);
+  const [offset, setOffset] = useState(0);
+  const query = filters.search.trim().toLowerCase();
+  const filtered = sessions.filter(
+    (row) =>
+      (!filters.model || row.harness + "/" + row.model === filters.model) &&
+      (!filters.status ||
+        (filters.status === "review"
+          ? row.review
+          : filters.status === "active"
+            ? isActive(row)
+            : row.status === filters.status)) &&
+      [
+        row.title,
+        row.environment,
+        row.model,
+        displayName(row.harness, row.model),
+        row.harness,
+      ].some((x) => x?.toLowerCase().includes(query)),
+  );
+  const start = Math.min(
+    offset,
+    Math.max(0, Math.floor((filtered.length - 1) / 25) * 25),
+  );
+  const page = filtered.slice(start, start + 25);
+  const controls = {
+    ...filters,
+    setModel: (s: string) => {
+      filters.setModel(s);
+      setOffset(0);
+    },
+    setStatus: (s: string) => {
+      filters.setStatus(s);
+      setOffset(0);
+    },
+    setSearch: (s: string) => {
+      filters.setSearch(s);
+      setOffset(0);
+    },
+  };
+  return sessions.length ? (
+    <>
+      <TableControls
+        {...controls}
+        models={[...new Set(sessions.map((s) => s.harness + "/" + s.model))]}
+        count={filtered.length}
+        total={sessions.length}
+      />
+      {page.length ? (
+        <HistoryPage
+          key={page.map((s) => s.id).join(",")}
+          ids={page.map((s) => s.id)}
+        />
+      ) : (
+        <EmptyState title="No sessions match these filters">{null}</EmptyState>
+      )}
+      {filtered.length > 25 && (
+        <div className="toolbar">
+          <Button disabled={start === 0} onClick={() => setOffset(start - 25)}>
+            Previous page
+          </Button>
+          <span>
+            {start + 1}–{start + page.length} of {filtered.length}
+          </span>
+          <Button
+            disabled={start + 25 >= filtered.length}
+            onClick={() => setOffset(start + 25)}
+          >
+            Next page
+          </Button>
+        </div>
+      )}
+    </>
+  ) : (
+    <NoSessions />
+  );
+}
+function HistoryPage({ ids }: { ids: string[] }) {
+  const { data, error, refresh } = useApi<Summary[]>(
+    `/sessions/history/page?ids=${ids.join(",")}`,
+    true,
+  );
+  return data ? (
+    <>
+      <Notice error={error} />
+      <ResultTable filtered={data} />
+    </>
+  ) : (
+    <RequestState error={error} retry={refresh} />
   );
 }
