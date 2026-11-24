@@ -62,6 +62,7 @@ export function nativeEntries(
           string(item.aggregated_output) ||
           blocksText(record(item.result).content) ||
           string(record(item.error).message),
+        ...(typeof item.exit_code === "number" && { exitCode: item.exit_code }),
         status:
           item.status === "failed" ||
           (typeof item.exit_code === "number" && item.exit_code !== 0)

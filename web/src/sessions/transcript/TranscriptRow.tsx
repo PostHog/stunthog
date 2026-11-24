@@ -55,8 +55,14 @@ export function TranscriptRow({
 
   const shell =
     entry.capture?.target.kind === "shell" ||
-    /^(bash|shell|exec_command|terminal)$/i.test(entry.name ?? entry.title);
+    /^(bash|shell|exec_command|command_execution|terminal)$/i.test(
+      entry.name ?? entry.title,
+    );
   const statusLabel = `${shell ? "Shell call" : "Tool"} ${entry.status ?? "status unavailable"}`;
+  const exitStatus =
+    shell && entry.exitCode !== undefined
+      ? ` · Exit code ${entry.exitCode}`
+      : "";
   return (
     <article
       className={`transcript-row transcript-${entry.kind}`}
@@ -69,9 +75,9 @@ export function TranscriptRow({
           <div className="tool-command">
             <span
               className={`tool-state ${entry.status}`}
-              title={statusLabel}
+              title={statusLabel + exitStatus}
               role="img"
-              aria-label={statusLabel}
+              aria-label={statusLabel + exitStatus}
             >
               <StatusIcon
                 name={
@@ -131,7 +137,7 @@ export function TranscriptRow({
               <CollapsibleTrigger>
                 <span className={`tool-result-status ${entry.status}`}>
                   {shell
-                    ? `Shell call ${entry.status ?? "status unavailable"} · Result`
+                    ? `${statusLabel}${exitStatus} · Result`
                     : entry.status === "failed"
                       ? "Failed"
                       : "Result"}
