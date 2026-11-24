@@ -353,6 +353,38 @@ async function verifyApplicationPersistence() {
       0,
     );
 
+    const { id: subsetId, ...copy } = duplicate;
+    const multi = await evals.save(
+      {
+        ...copy,
+        models: [model, { ...model, model: "unselected-model" }],
+      },
+      subsetId,
+    );
+    for (const selection of [
+      { revision: multi.revision - 1, models: [0] },
+      { revision: multi.revision, models: [2] },
+    ])
+      await assert.rejects(
+        starter.start(subsetId, selection),
+        /Reload the evaluation/,
+      );
+    const subset = await starter.start(subsetId, {
+      revision: multi.revision,
+      models: [0],
+    });
+    await starter.onModuleDestroy();
+    assert.equal(subset.sessionIds.length, model.count);
+    assert.deepEqual(
+      (await evals.get(subsetId)).snapshot().models,
+      multi.models,
+    );
+    const subsetSessions = await db.session.findMany({
+      where: { batchId: subset.batchId },
+      select: { model: true },
+    });
+    assert.ok(subsetSessions.every((session) => session.model === model.model));
+
     const { id: _id, ...revision } = withShell;
 
     const revised = await evals.save(
