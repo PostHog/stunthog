@@ -13,6 +13,7 @@ import { api, useApi } from "../api.js";
 import { Notice, PageTitle } from "../components.js";
 import { EmptyState, Feedback, RequestState } from "../PageState.js";
 import type { Resource, Resources } from "../types.js";
+import { connectMcp } from "./connect-mcp.js";
 import { ResourceForm } from "./ResourceForm.js";
 import { type ResourceKind, resourceInfo } from "./resource-info.js";
 
@@ -40,23 +41,10 @@ export function ResourcePage({ kind }: { kind: ResourceKind }) {
 
   async function connect(resource: Resource) {
     setFailure("");
-    const popup = window.open("about:blank", "_blank");
-    if (!popup) {
-      setFailure("Allow pop-ups to connect this MCP server.");
-      return;
-    }
-
-    popup.opener = null;
-    popup.document.body.textContent = "Starting MCP authorization…";
     setConnecting(resource.id);
     try {
-      const { authorizationUrl } = await api<{ authorizationUrl: string }>(
-        `/resources/${resource.id}/connect`,
-        { method: "POST" },
-      );
-      popup.location.replace(authorizationUrl);
+      await connectMcp(resource.id);
     } catch (error) {
-      popup.close();
       setFailure(String(error));
     } finally {
       setConnecting("");

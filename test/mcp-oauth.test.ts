@@ -7,6 +7,7 @@ import { Resource } from "../src/catalog/domain/resource.js";
 import { McpOAuth } from "../src/catalog/infrastructure/mcp-oauth.js";
 import { PrismaCatalog } from "../src/catalog/infrastructure/prisma-catalog.js";
 import { KeyVault } from "../src/credentials/key-vault.js";
+import { ResourcesController } from "../src/http/resources-controller.js";
 import { Database } from "../src/infrastructure/database.js";
 import { migrateDatabase } from "../src/infrastructure/migrations.js";
 
@@ -50,6 +51,8 @@ test("MCP URL and OAuth credentials survive restart and concurrent use refreshes
         if (body.get("grant_type") === "refresh_token") {
           assert.equal(body.get("refresh_token"), "mock-refresh-token");
           refreshes++;
+          if (refreshes > 1)
+            return Response.json({ error: "invalid_grant" }, { status: 400 });
           return Response.json({
             access_token: "mock-new-access-token",
             token_type: "Bearer",
@@ -97,6 +100,18 @@ test("MCP URL and OAuth credentials survive restart and concurrent use refreshes
       ["mock-new-access-token", "mock-new-access-token"],
     );
     assert.equal(refreshes, 1);
+    const reconnect = new URL(
+      await restarted.connect(url, "http://127.0.0.1:3100/callback"),
+    );
+    const newState = reconnect.searchParams.get("state");
+    assert.ok(newState);
+    await restarted.complete(newState, "test-code");
+    const resource = (await catalog.list()).mcps[0];
+    assert.ok(resource);
+    const controller = new ResourcesController(catalog, restarted);
+    assert.deepEqual(await controller.connection(resource.id), {
+      status: "authorization",
+    });
   } finally {
     await server.stop(true);
     await db.$disconnect();
