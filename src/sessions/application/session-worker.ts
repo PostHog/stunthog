@@ -15,6 +15,7 @@ import { HarnessRegistry } from "../../harnesses/domain/harness-registry.js";
 import { redactEvent } from "../../harnesses/domain/redact-secrets.js";
 import { ModelRewriter } from "../../overrides/application/model-rewriter.js";
 import type { ResponseCapture } from "../../overrides/domain/response-override.js";
+import { hasAgentEvidence } from "../domain/agent-evidence.js";
 import type { ExecutionSnapshot } from "../domain/execution-snapshot.js";
 import { judgingPrompt } from "../domain/judging-prompt.js";
 import type { Session } from "../domain/session.js";
@@ -126,13 +127,6 @@ export class SessionWorker {
       agentRuntime = undefined;
       await this.sessions.save(session, agent);
       signal.throwIfAborted();
-      session.beginJudging(
-        agent.status === "failed"
-          ? (agent.error ?? "The agent execution failed.")
-          : null,
-      );
-      await this.sessions.save(session, agent);
-
       const piMessages =
         adapter.id === "pi"
           ? await readFile(join(root, "agent", "messages.json"), "utf8").catch(
@@ -142,6 +136,24 @@ export class SessionWorker {
       const evidence =
         piMessages ??
         JSON.stringify(await this.sessions.events(session.id, "agent"));
+      if (
+        agent.status === "failed" &&
+        !agent.text.trim() &&
+        !hasAgentEvidence(evidence)
+      ) {
+        session.fail(
+          agent.error ?? "The agent stopped before it recorded any activity.",
+        );
+        await this.sessions.save(session, agent);
+        return;
+      }
+      session.beginJudging(
+        agent.status === "failed"
+          ? (agent.error ?? "The agent execution failed.")
+          : null,
+      );
+      await this.sessions.save(session, agent);
+
       const judgeWorkspace = join(root, "judge-workspace");
       const intercepts = await this.sessions.modifiedResponses(session.id);
       const interceptedIds = intercepts.map((call) => call.callId);
