@@ -35,6 +35,7 @@ export function LogPanel({
   entries: rawEntries,
   error,
   initialCallId,
+  loadOlder,
   initialEntryId,
 }: {
   session: Session;
@@ -43,6 +44,7 @@ export function LogPanel({
   entries: TranscriptEntry[];
   error: string;
   initialCallId?: string;
+  loadOlder?: (() => void) | undefined;
   initialEntryId?: string;
 }) {
   const entries = useMemo(
@@ -252,6 +254,11 @@ export function LogPanel({
               )}
             </TranscriptRow>
           ))}
+          {loadOlder && (
+            <Button type="button" onClick={loadOlder}>
+              {error ? "Retry loading events" : "Load more trace events"}
+            </Button>
+          )}
           {visible.length > shown.length && (
             <Button
               type="button"

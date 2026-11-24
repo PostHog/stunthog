@@ -57,7 +57,22 @@ function SessionView({
   const [cancelling, setCancelling] = useState(false);
   const [jump, setJump] = useState({ callId: "", entryId: "", visit: 0 });
   const active = !!session && isActive(session);
-  const { events, error: traceError } = useSessionEvents(id, active);
+  const [judgeOpened, setJudgeOpened] = useState(false);
+  const agentTrace = useSessionEvents(id, "agent", !!session, active);
+  const judgeTrace = useSessionEvents(id, "judge", judgeOpened, active);
+  const interceptTrace = useSessionEvents(
+    id,
+    "intercepts",
+    !!session?.interceptedCalls,
+    active,
+  );
+  const events = agentTrace.events;
+  const captures = useMemo(() => {
+    const bySequence = new Map<number, (typeof events)[number]>();
+    for (const row of [...events, ...interceptTrace.events])
+      if (row.phase === "response") bySequence.set(row.sequence, row);
+    return [...bySequence.values()].sort((a, b) => a.sequence - b.sequence);
+  }, [events, interceptTrace.events]);
   // A session retains the configuration captured at creation.
   const [snapshot] = useState(session.snapshot);
   const agentEntries = useMemo(
@@ -65,18 +80,20 @@ function SessionView({
       snapshot
         ? withResponses(
             buildTranscript(events.filter((event) => event.phase === "agent")),
-            events.filter((event) => event.phase === "response"),
+            captures,
             snapshot,
           )
         : [],
-    [events, snapshot],
+    [events, snapshot, captures],
   );
   const judgeEntries = useMemo(
     () =>
       tab === "judge"
-        ? buildTranscript(events.filter((event) => event.phase === "judge"))
+        ? buildTranscript(
+            judgeTrace.events.filter((event) => event.phase === "judge"),
+          )
         : [],
-    [events, tab],
+    [judgeTrace.events, tab],
   );
 
   async function cancel() {
@@ -129,7 +146,10 @@ function SessionView({
           <Tabs
             className="session-tabs"
             value={tab}
-            onValueChange={(value) => setTab(String(value))}
+            onValueChange={(value) => {
+              if (value === "judge") setJudgeOpened(true);
+              setTab(String(value));
+            }}
           >
             <TabsList className="session-tab-list" aria-label="Session views">
               <TabsTrigger value="agent">
@@ -152,7 +172,12 @@ function SessionView({
                 active={active}
                 phase="agent"
                 entries={agentEntries}
-                error={traceError}
+                error={agentTrace.error || interceptTrace.error}
+                loadOlder={
+                  agentTrace.more || agentTrace.error
+                    ? () => void agentTrace.load()
+                    : undefined
+                }
                 initialCallId={jump.callId}
                 initialEntryId={jump.entryId}
               />
@@ -163,7 +188,12 @@ function SessionView({
                 active={active}
                 phase="judge"
                 entries={judgeEntries}
-                error={traceError}
+                error={judgeTrace.error}
+                loadOlder={
+                  judgeTrace.more || judgeTrace.error
+                    ? () => void judgeTrace.load()
+                    : undefined
+                }
               />
             </TabsContent>
             <TabsContent value="files">
@@ -194,6 +224,11 @@ function SessionView({
               setTab("agent");
             }}
             onInspect={(callId) => {
+              const row = captures.find(
+                (row) =>
+                  (row.event as { callId?: string } | null)?.callId === callId,
+              );
+              if (row && agentTrace.more) void agentTrace.load(row.sequence);
               setJump((current) => ({
                 callId,
                 entryId: "",

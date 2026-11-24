@@ -124,17 +124,44 @@ export class SessionsController {
   }
 
   @Get(":id/events")
-  events(@Param("id") sessionId: string, @Query("after") after = "0") {
+  events(
+    @Param("id") sessionId: string,
+    @Query("after") after = "0",
+    @Query("view") view?: string,
+  ) {
+    const cursor = z.coerce.number().int().nonnegative().parse(after);
+    if (view) {
+      const phase = z.enum(["agent", "judge", "intercepts"]).parse(view);
+      // The readable transcript uses final messages. The raw event endpoint retains all streaming updates.
+      const condition =
+        phase === "intercepts"
+          ? Prisma.sql`phase='response' AND json_type(event,'$.ruleId')='text'`
+          : Prisma.sql`phase IN (${Prisma.join(phase === "agent" ? ["agent", "response"] : ["judge"])}) AND COALESCE(json_extract(event,'$.type'),'') NOT IN ('message_update','message_start','turn_start','turn_end','agent_start','agent_end')`;
+      return this.readEventWindow(sessionId, cursor, condition);
+    }
     return this.db.sessionEvent.findMany({
       where: {
         sessionId,
-        sequence: { gt: z.coerce.number().int().nonnegative().parse(after) },
+        sequence: { gt: cursor },
       },
       orderBy: { sequence: "asc" },
       take: 500,
     });
   }
 
+  private async readEventWindow(
+    sessionId: string,
+    cursor: number,
+    condition: Prisma.Sql,
+  ) {
+    const rows = await this.db.$queryRaw<
+      { id: bigint | number }[]
+    >`SELECT id FROM SessionEvent WHERE sessionId=${sessionId} AND sequence>${cursor} AND ${condition} ORDER BY sequence LIMIT 100`;
+    return this.db.sessionEvent.findMany({
+      where: { sessionId, id: { in: rows.map((row) => Number(row.id)) } },
+      orderBy: { sequence: "asc" },
+    });
+  }
   @Get(":id/files")
   files(@Param("id") sessionId: string) {
     return this.db.sessionArtifact.findMany({
