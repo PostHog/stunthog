@@ -231,7 +231,9 @@ export function LogPanel({
               {saved === entry.id && (
                 <output className="trace-intercept-saved">
                   Saved for the next run.{" "}
-                  <a href={`#evals/${session.evalId}/edit`}>View evaluation</a>
+                  <a href={`#evals/${session.evalId}`}>
+                    View evaluation and run
+                  </a>
                 </output>
               )}
             </TranscriptRow>
