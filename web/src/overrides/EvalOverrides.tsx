@@ -73,7 +73,11 @@ export function EvalOverrides({
                       Jev · {rule.decision.prompt}
                     </small>
                   )}
-                  <small className="muted">Find {rule.find}</small>
+                  <small className="muted">
+                    {rule.llmEdit
+                      ? `LLM edit · ${rule.llmEdit.prompt}`
+                      : `Find ${rule.find}`}
+                  </small>
                 </span>
               </Button>
               {i > 0 && (

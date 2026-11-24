@@ -5,7 +5,7 @@ import {
   type Provider,
   providers,
 } from "../../credentials/provider.js";
-import { DecisionModel } from "../application/model-ports.js";
+import { DecisionModel, SingleCallLlm } from "../application/model-ports.js";
 
 async function post(
   keys: CredentialStore,
@@ -84,5 +84,60 @@ export class JevDecisionModel extends DecisionModel {
       model: parsed.data.model,
       probability: parsed.data.answers.intercept.noul,
     };
+  }
+}
+
+@Injectable()
+export class OpenRouterLlm extends SingleCallLlm {
+  constructor(@Inject(CredentialStore) private readonly keys: CredentialStore) {
+    super();
+  }
+  async text(
+    model: string,
+    instructions: string,
+    input: unknown,
+    signal: AbortSignal,
+    schema?: z.ZodType,
+  ): Promise<string> {
+    const data = await post(
+      this.keys,
+      "openrouter",
+      "OpenRouter",
+      "https://openrouter.ai/api/v1/chat/completions",
+      {
+        model,
+        messages: [
+          { role: "system", content: instructions },
+          { role: "user", content: JSON.stringify(input) },
+        ],
+        ...(schema && {
+          provider: { require_parameters: true },
+          response_format: {
+            type: "json_schema",
+            json_schema: {
+              name: "result",
+              strict: true,
+              schema: z.toJSONSchema(schema),
+            },
+          },
+        }),
+      },
+      signal,
+    );
+    const completion = z
+      .object({
+        choices: z
+          .array(
+            z.object({
+              finish_reason: z.literal("stop"),
+              message: z.object({ content: z.string() }),
+            }),
+          )
+          .nonempty(),
+      })
+      .safeParse(data);
+    if (completion.success && completion.data.choices[0])
+      return completion.data.choices[0].message.content;
+    throw new Error("The language model returned an invalid result.");
   }
 }

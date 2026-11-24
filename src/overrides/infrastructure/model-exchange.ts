@@ -20,6 +20,7 @@ const replySchema = z.object({
   value: z.union([z.string(), z.record(z.unknown())]),
   ruleId: z.string().uuid().optional(),
   error: z.string().max(512).optional(),
+  rationale: z.string().max(4096).optional(),
   decisions: z.array(decisionEvidenceSchema).max(40).optional(),
 });
 
@@ -32,7 +33,11 @@ export async function publish(path: string, content: string) {
 // Native tools share this session directory with the host, including in Docker.
 export function relayRewrite(directory: string): Rewrite {
   return async (rules, call, original) => {
-    if (!rules.some((r) => r.target.kind === call.target.kind && r.decision)) {
+    if (
+      !rules.some(
+        (r) => r.target.kind === call.target.kind && (r.decision || r.llmEdit),
+      )
+    ) {
       return rewriteResponse(rules, call, original);
     }
     const path = join(directory, randomUUID());
@@ -56,6 +61,7 @@ export function relayRewrite(directory: string): Rewrite {
             ...(data.ruleId && { ruleId: data.ruleId }),
             ...(data.error && { error: data.error }),
             decisions: data.decisions,
+            rationale: data.rationale,
           };
         } catch (error) {
           if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;

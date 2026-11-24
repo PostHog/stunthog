@@ -208,8 +208,8 @@ export function OverrideDialog({
     if (/[\r\n]/.test(field.text.replaceAll(newline, ""))) return;
     return { ...field, newline };
   }, [picked]);
-  const usesModel = !!rule.decision;
-  const direct = method === "direct" && !!passage;
+  const usesModel = !!(rule.decision || rule.llmEdit);
+  const direct = !rule.llmEdit && method === "direct" && !!passage;
   const [example, setExample] = useState("");
   const [args, setArgs] = useState("");
   const [newServer, setNewServer] = useState(false);
@@ -241,9 +241,9 @@ export function OverrideDialog({
   const canApply =
     !busy &&
     (!rule.decision || Boolean(rule.decision.prompt.trim())) &&
-    !editIssue &&
-    !!rule.find &&
-    !sameText &&
+    (rule.llmEdit
+      ? Boolean(rule.llmEdit.prompt.trim() && rule.llmEdit.model.trim())
+      : !editIssue && !!rule.find && !sameText) &&
     targetChosen &&
     validServer &&
     (source.kind !== "shell" ||
@@ -296,7 +296,9 @@ export function OverrideDialog({
           args: input,
           original,
         }),
-        original: previewText(original, rule.path),
+        original: rule.llmEdit
+          ? displayResponse(original)
+          : previewText(original, rule.path),
         issue: "",
       };
     } catch {
@@ -430,7 +432,9 @@ export function OverrideDialog({
     );
   const delivered =
     result && !result.error
-      ? previewText(result.value, rule.path)
+      ? rule.llmEdit
+        ? displayResponse(result.value)
+        : previewText(result.value, rule.path)
       : preview.original;
   const destination = !targetChosen
     ? "Choose a destination"
@@ -573,6 +577,7 @@ export function OverrideDialog({
       <section className="override-workspace">
         <OverrideEngines
           decision={rule.decision}
+          llmEdit={rule.llmEdit}
           change={(patch) => {
             setEditIssue("");
             change(patch);
@@ -759,7 +764,7 @@ export function OverrideDialog({
               </div>
             </details>
           )}
-          {passage && (
+          {passage && !rule.llmEdit && (
             <Tabs
               value={direct ? "direct" : "pattern"}
               onValueChange={(value) => {
@@ -775,7 +780,7 @@ export function OverrideDialog({
             </Tabs>
           )}
         </div>
-        {!direct && (
+        {!direct && !rule.llmEdit && (
           <div className="override-pattern">
             <Tabs
               value={rule.mode}

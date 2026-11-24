@@ -289,7 +289,7 @@ for (const docker of [false, true])
           },
           {
             ...mcpRule,
-            decision: { prompt: "Is this a document?" },
+            llmEdit: { model: "fixture", prompt: "Edit the doc." },
           },
           {
             ...shellRule,
@@ -299,6 +299,13 @@ for (const docker of [false, true])
         rewrite: (rules, call, original) =>
           rewriteResponse(rules, call, original, {
             decide: async () => ({ model: "fixture", probability: 0.98 }),
+            edit: async (_settings, response) => {
+              const result = await rewriteResponse([mcpRule], call, response);
+              return {
+                value: result.value,
+                rationale: "Changed the document text.",
+              };
+            },
           }),
         onToolResponse: async (capture) => {
           snapshots.push(capture);
@@ -552,7 +559,11 @@ for (const docker of [false, true])
           }
         }
         assert.equal(snapshots.length, 12);
-
+        assert.equal(
+          snapshots.filter((c) => c.rationale === "Changed the document text.")
+            .length,
+          4,
+        );
         const shells = snapshots.filter((c) => c.target.kind === "shell");
         assert.equal(shells.length, 4);
         assert.ok(shells.every((c) => c.decisions?.[0]?.probability === 0.98));
