@@ -1,11 +1,13 @@
-import { ModelReference } from "../models/ModelReference.js";
+import { ModelKey, ModelReference } from "../models/ModelReference.js";
 import type { EvaluationData, Resources, Session } from "../types.js";
 
 export function EvalConfiguration({
   definition,
   snapshot,
   resources: data,
+  recordedModels,
 }: {
+  recordedModels?: string[];
   definition: EvaluationData;
   resources: Resources | undefined;
   snapshot?: Session["snapshot"];
@@ -42,43 +44,59 @@ export function EvalConfiguration({
       <dl>
         <dt>Revision</dt>
         <dd>{definition.revision}</dd>
-        <dt>Environment</dt>
-        <dd>
-          {environment ??
-            (definition.environmentId ? "Unavailable" : "Empty workspace")}
-        </dd>
-        <dt>Persona</dt>
-        <dd>{persona ?? (definition.personaId ? "Unavailable" : "None")}</dd>
-        <dt>Skills</dt>
-        <dd>
-          {skills?.map((item) => item.title).join(", ") ||
-            (definition.skillIds.length
-              ? `${definition.skillIds.length} selected`
-              : "None")}
-        </dd>
-        <dt>MCP servers</dt>
-        <dd>
-          {mcps?.map((item) => item.title).join(", ") ||
-            (definition.mcpIds.length
-              ? `${definition.mcpIds.length} selected`
-              : "None")}
-        </dd>
-        {!!definition.responseOverrides?.length && (
+        {recordedModels ? (
           <>
-            <dt>Response overrides</dt>
-            <dd>{definition.responseOverrides.length}</dd>
+            <dt>Recorded {recordedModels.length === 1 ? "agent" : "agents"}</dt>
+            {recordedModels.map((model) => (
+              <dd key={model}>
+                <ModelKey value={model} />
+              </dd>
+            ))}
+          </>
+        ) : (
+          <>
+            <dt>Environment</dt>
+            <dd>
+              {environment ??
+                (definition.environmentId ? "Unavailable" : "Empty workspace")}
+            </dd>
+            <dt>Persona</dt>
+            <dd>
+              {persona ?? (definition.personaId ? "Unavailable" : "None")}
+            </dd>
+            <dt>Skills</dt>
+            <dd>
+              {skills?.map((item) => item.title).join(", ") ||
+                (definition.skillIds.length
+                  ? `${definition.skillIds.length} selected`
+                  : "None")}
+            </dd>
+            <dt>MCP servers</dt>
+            <dd>
+              {mcps?.map((item) => item.title).join(", ") ||
+                (definition.mcpIds.length
+                  ? `${definition.mcpIds.length} selected`
+                  : "None")}
+            </dd>
+            {!!definition.responseOverrides?.length && (
+              <>
+                <dt>Response overrides</dt>
+                <dd>{definition.responseOverrides.length}</dd>
+              </>
+            )}
+            <dt>Session models</dt>
+            {!definition.models.length && <dd>None</dd>}
+            {definition.models.map((model, index) => (
+              <dd key={`${index}-${model.model}`}>
+                <ModelReference harness={model.harness} model={model.model} />
+                <small>
+                  {model.count} {model.count === 1 ? "session" : "sessions"} ·{" "}
+                  {model.effort} effort
+                </small>
+              </dd>
+            ))}
           </>
         )}
-        <dt>Session models</dt>
-        {definition.models.map((model, index) => (
-          <dd key={`${index}-${model.model}`}>
-            <ModelReference harness={model.harness} model={model.model} />
-            <small>
-              {model.count} {model.count === 1 ? "session" : "sessions"} ·{" "}
-              {model.effort} effort
-            </small>
-          </dd>
-        ))}
         <dt>Judge</dt>
         <dd>
           <ModelReference

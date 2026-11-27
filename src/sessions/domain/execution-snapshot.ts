@@ -1,11 +1,35 @@
 import type { EvaluationData } from "../../evaluations/domain/evaluation.js";
 
+import type { ModelSettingsData } from "../../evaluations/domain/model-settings.js";
+import type { BackgroundEntry, TraceEdit } from "./trace-edit.js";
+
+export interface EditedSessionStart {
+  settings: ModelSettingsData;
+  task: string;
+  background: BackgroundEntry[];
+  label: string;
+  change: string;
+  field: TraceEdit["field"];
+  workspace: "initial" | "empty";
+}
+
 export interface ExecutionSnapshot {
+  agentSettings?: ModelSettingsData;
+  editedStart?: {
+    label: string;
+    change?: string;
+    field?: TraceEdit["field"];
+    fingerprint: string;
+    hasBackground: boolean;
+    workspace: "initial" | "empty";
+  };
+  promptCheckpoint?: ModelSettingsData;
   evaluation: EvaluationData;
   environment: {
     title: string;
     workspacePath: string | null;
     repositoryUrl: string | null;
+    restoredImage?: string;
     executionMode: "local" | "docker";
     dockerfilePath: string | null;
     dockerfileContent: string | null;

@@ -29,6 +29,8 @@ function session(status: string): Session {
 
   return {
     id: status,
+    origin: "synthetic",
+    memo: null,
     interceptedCalls: 0,
     evalId: evaluation.id,
     batchId: "run",

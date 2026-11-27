@@ -36,7 +36,14 @@ export function App() {
         <EvalList />
       );
   else if (page === "sessions")
-    content = id ? <SessionDetail id={id} /> : <SessionList />;
+    content = id ? (
+      <SessionDetail
+        id={id}
+        branch={new URLSearchParams(route.split("?")[1]).get("branch")}
+      />
+    ) : (
+      <SessionList />
+    );
   else if (page === "credentials") content = <CredentialsPage />;
   else if (page === "harnesses") content = <HarnessesPage />;
   else if (page === "settings") content = <SettingsPage />;

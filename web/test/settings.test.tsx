@@ -148,7 +148,7 @@ test("saved model and judge defaults prefill new evaluations without changing ex
   assert.equal(settings.evaluationDefaults.models.length, 1);
   newEval.unmount();
   const restoredDraft = render(<EvalEditor />);
-  await screen.findByText("No models selected");
+  await screen.findByText("No sessions selected");
   restoredDraft.unmount();
 
   const editEval = render(<EvalEditor id={existing.id} />);
@@ -159,6 +159,6 @@ test("saved model and judge defaults prefill new evaluations without changing ex
 
   settings = { ...settings, evaluationDefaults: { models: [], judge: null } };
   render(<EvalEditor />);
-  await screen.findByText("No models selected");
+  await screen.findByText("No sessions selected");
   await screen.findByText("No judge selected");
 });

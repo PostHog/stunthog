@@ -25,6 +25,7 @@ import { StatusIcon } from "../status/StatusIcon.js";
 import type { EvaluationData, Resources, Session } from "../types.js";
 import { criterionDecisions } from "./acceptance.js";
 import { EvalConfiguration } from "./EvalConfiguration.js";
+import { LoadSessionDialog } from "./LoadSessionDialog.js";
 import { RunComparison } from "./RunComparison.js";
 
 export function EvalDetail({ id }: { id: string }) {
@@ -39,8 +40,10 @@ export function EvalDetail({ id }: { id: string }) {
     refresh,
   } = useApi<Session[]>(`/sessions?evalId=${id}`, true);
   const { data: resources } = useApi<Resources>("/resources");
+  const [loadingFile, setLoadingFile] = useState(false);
   const [runError, setRunError] = useState("");
   const [starting, setStarting] = useState(false);
+  const [selectedRunOnly, setSelectedRunOnly] = useState(false);
   const [batch, setBatch] = useState("latest");
   const [message, setMessage] = useState("");
 
@@ -53,8 +56,8 @@ export function EvalDetail({ id }: { id: string }) {
     try {
       await api(`/evals/${id}/run`, {
         method: "POST",
-        ...(selection && {
-          body: JSON.stringify({
+        body: JSON.stringify({
+          ...(selection && {
             selection: { revision: evaluation?.revision, models: selection },
           }),
         }),
@@ -71,10 +74,9 @@ export function EvalDetail({ id }: { id: string }) {
 
   if (!evaluation) return <RequestState error={error} retry={refreshEval} />;
 
-  const batches = [
-    ...new Set((allSessions ?? []).map((session) => session.batchId)),
-  ];
-  const sessions = (allSessions ?? []).filter(
+  const originals = allSessions ?? [];
+  const batches = [...new Set(originals.map((session) => session.batchId))];
+  const sessions = originals.filter(
     (session) => session.batchId === (batch === "latest" ? batches[0] : batch),
   );
   const definition = sessions[0]?.snapshot.evaluation ?? evaluation;
@@ -104,16 +106,46 @@ export function EvalDetail({ id }: { id: string }) {
         />
         <Button
           type="button"
-          variant="primary"
-          disabled={starting || count === 0}
-          onClick={() => void run()}
+          variant={evaluation.models.length ? "outline" : "primary"}
+          onClick={() => setLoadingFile(true)}
         >
-          {starting && <StatusIcon name="spinner" />}
-          {starting
-            ? "Preparing sessions..."
-            : `Run ${count} ${running ? "more " : ""}${count === 1 ? "session" : "sessions"}`}
+          Load session file
         </Button>
+        {evaluation.models.length > 0 && (
+          <Button
+            type="button"
+            variant="primary"
+            disabled={starting || count === 0}
+            onClick={() => void run()}
+          >
+            {starting && <StatusIcon name="spinner" />}
+            {starting
+              ? "Preparing sessions..."
+              : `Run ${count} ${running ? "more " : ""}${count === 1 ? "session" : "sessions"}`}
+          </Button>
+        )}
       </PageTitle>
+      {loadingFile && (
+        <LoadSessionDialog
+          onClose={() => setLoadingFile(false)}
+          onLoad={async ({ file, memo }) => {
+            const body = new FormData();
+            body.set("file", file);
+            body.set("memo", memo);
+            const { batchId } = await api<{ batchId: string }>(
+              `/evals/${id}/session-file`,
+              { method: "POST", body },
+            );
+            setLoadingFile(false);
+            setBatch(batchId);
+            setRunError("");
+            setMessage(
+              "Organic session loaded. The judge will check the recorded activity.",
+            );
+            refresh();
+          }}
+        />
+      )}
       {evaluation.models.length > 1 && (
         <details className="section-note">
           <summary>Select models for this run</summary>
@@ -170,9 +202,8 @@ export function EvalDetail({ id }: { id: string }) {
         </div>
       )}
       <p className="section-note">
-        Runs use revision {evaluation.revision}. Each session uses a separate
-        workspace and receives one judgment. Agent and judge calls both incur
-        usage.
+        Synthetic sessions run the agent and the judge. Organic sessions use a
+        recorded log and run only the judge.
       </p>
       <div className="toolbar">
         <Field label="Run">
@@ -183,7 +214,7 @@ export function EvalDetail({ id }: { id: string }) {
             options={[
               { value: "latest", label: "Latest run" },
               ...batches.map((id) => {
-                const run = (allSessions ?? []).filter(
+                const run = originals.filter(
                   (session) => session.batchId === id,
                 );
                 const [first] = run;
@@ -192,7 +223,7 @@ export function EvalDetail({ id }: { id: string }) {
                   first.snapshot.evaluation.responseOverrides?.length ?? 0;
                 return {
                   value: id,
-                  label: `${new Date(first.createdAt).toLocaleString()} · Revision ${first.snapshot.evaluation.revision} · ${count} ${count === 1 ? "override" : "overrides"} · ${run.length} ${run.length === 1 ? "session" : "sessions"}`,
+                  label: `${new Date(first.createdAt).toLocaleString()} · ${first.origin === "organic" ? "Organic · " : ""}Revision ${first.snapshot.evaluation.revision} · ${count} ${count === 1 ? "override" : "overrides"} · ${run.length} ${run.length === 1 ? "session" : "sessions"}`,
                 };
               }),
             ]}
@@ -271,6 +302,7 @@ export function EvalDetail({ id }: { id: string }) {
           </Collapsible>
         </section>
         <EvalConfiguration
+          {...(sessions[0]?.origin === "organic" && { recordedModels: models })}
           definition={definition}
           resources={resources}
           snapshot={sessions[0]?.snapshot}
@@ -287,12 +319,21 @@ export function EvalDetail({ id }: { id: string }) {
       />
       {sessions.length > 0 && <UsageSummary sessions={sessions} />}
       <section className="section">
-        <h2>Agent sessions</h2>
+        <div className="section-heading">
+          <h2>Agent sessions</h2>
+          {batches.length > 1 && (
+            <label className="checkbox">
+              <input
+                type="checkbox"
+                checked={selectedRunOnly}
+                onChange={(event) => setSelectedRunOnly(event.target.checked)}
+              />
+              Selected run only
+            </label>
+          )}
+        </div>
         {allSessions ? (
-          <SessionsTable
-            sessions={sessions}
-            key={batch === "latest" ? (batches[0] ?? "empty") : batch}
-          />
+          <SessionsTable sessions={selectedRunOnly ? sessions : allSessions} />
         ) : (
           <RequestState error={sessionsError} retry={refresh} />
         )}

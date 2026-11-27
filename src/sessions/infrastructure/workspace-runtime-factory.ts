@@ -35,6 +35,7 @@ class DockerWorkspaceRuntime implements HarnessRuntime {
   private constructor(
     private readonly root: string,
     private readonly container: string,
+    readonly imageId: string,
   ) {}
 
   static async start(
@@ -43,20 +44,17 @@ class DockerWorkspaceRuntime implements HarnessRuntime {
     dockerfileContent: string | null,
     harness: HarnessId,
     signal: AbortSignal,
+    restoredImage?: string,
   ) {
-    const build = await prepareDockerBuild(
-      root,
-      dockerfilePath,
-      dockerfileContent,
-      harness,
-    );
-    const image = (
-      await control(
-        ["build", "--quiet", "--file", build.dockerfile, build.context],
+    const image =
+      restoredImage ??
+      (await buildDockerImage(
+        root,
+        dockerfilePath,
+        dockerfileContent,
+        harness,
         signal,
-      )
-    ).trim();
-
+      ));
     if (!image) throw new Error("Docker did not return an image ID.");
 
     const container = (
@@ -65,6 +63,7 @@ class DockerWorkspaceRuntime implements HarnessRuntime {
           "run",
           "--detach",
           "--rm",
+          ...(restoredImage ? ["--pull=never"] : []),
           "--mount",
           `type=bind,source=${root},target=/stunthog`,
           "--workdir",
@@ -80,7 +79,7 @@ class DockerWorkspaceRuntime implements HarnessRuntime {
 
     if (!container) throw new Error("Docker did not return a container ID.");
 
-    return new DockerWorkspaceRuntime(root, container);
+    return new DockerWorkspaceRuntime(root, container, image);
   }
 
   async process(command: ProcessCommand, cwd: string): Promise<ProcessCommand> {
@@ -190,7 +189,11 @@ export class DefaultWorkspaceRuntimeFactory extends WorkspaceRuntimeFactory {
     if (environment?.executionMode !== "docker")
       return new LocalWorkspaceRuntime();
 
-    if (!environment.dockerfilePath && !environment.dockerfileContent)
+    if (
+      !environment.restoredImage &&
+      !environment.dockerfilePath &&
+      !environment.dockerfileContent
+    )
       throw new Error(
         "The Docker environment has no Dockerfile configuration.",
       );
@@ -203,6 +206,7 @@ export class DefaultWorkspaceRuntimeFactory extends WorkspaceRuntimeFactory {
       environment.dockerfileContent,
       harness,
       signal,
+      environment.restoredImage,
     );
   }
 }
@@ -212,6 +216,27 @@ const harnessPackages: Partial<Record<HarnessId, string>> = {
   codex: "@openai/codex@0.169.0",
   opencode: "opencode-ai@1.19.5",
 };
+
+async function buildDockerImage(
+  root: string,
+  dockerfilePath: string | null,
+  dockerfileContent: string | null,
+  harness: HarnessId,
+  signal: AbortSignal,
+) {
+  const build = await prepareDockerBuild(
+    root,
+    dockerfilePath,
+    dockerfileContent,
+    harness,
+  );
+  return (
+    await control(
+      ["build", "--quiet", "--file", build.dockerfile, build.context],
+      signal,
+    )
+  ).trim();
+}
 
 async function prepareDockerBuild(
   root: string,

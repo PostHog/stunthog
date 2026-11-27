@@ -23,7 +23,10 @@ export class SessionsController {
   @Get()
   async list(@Query("evalId") evalId?: string) {
     const sessions = await this.db.session.findMany({
-      where: evalId ? { evalId: z.string().uuid().parse(evalId) } : {},
+      where: {
+        parentSessionId: null,
+        ...(evalId && { evalId: z.string().uuid().parse(evalId) }),
+      },
       orderBy: { createdAt: "desc" },
       take: 500,
       include: { eval: { select: { title: true } }, decisions: true },
@@ -31,10 +34,25 @@ export class SessionsController {
     const counts = await this.interceptedCalls(
       sessions.map((session) => session.id),
     );
+    const branchCounts = await this.branchCounts(sessions.map((s) => s.id));
     return sessions.map((session) => ({
       ...session,
+      branchCount: branchCounts.get(session.id) ?? 0,
       interceptedCalls: counts.get(session.id) ?? 0,
     }));
+  }
+
+  private async branchCounts(ids: string[]) {
+    const branches = ids.length
+      ? await this.db.session.groupBy({
+          by: ["rootSessionId"],
+          where: { rootSessionId: { in: ids } },
+          _count: true,
+        })
+      : [];
+    return new Map(
+      branches.map((group) => [group.rootSessionId, group._count]),
+    );
   }
 
   private async interceptedCalls(ids: string[]) {
@@ -49,7 +67,7 @@ export class SessionsController {
 
   @Get("history")
   async history() {
-    // Search applies to every session, including rows beyond the first page.
+    // Search all original sessions before paginating.
     const rows = await this.db.$queryRaw<
       {
         id: string;
@@ -65,7 +83,7 @@ export class SessionsController {
         CASE WHEN s.status IN ('queued','running','judging') THEN 0 WHEN s.status!='completed' OR
           NOT EXISTS(SELECT 1 FROM SessionDecision d WHERE d.sessionId=s.id) OR
           EXISTS(SELECT 1 FROM SessionDecision d WHERE d.sessionId=s.id AND d.passed=0) THEN 1 ELSE 0 END AS review
-      FROM Session s JOIN Eval e ON e.id=s.evalId ORDER BY s.createdAt DESC,s.id DESC`;
+      FROM Session s JOIN Eval e ON e.id=s.evalId WHERE s.parentSessionId IS NULL ORDER BY s.createdAt DESC,s.id DESC`;
     return rows.map((row) => ({ ...row, review: Boolean(row.review) }));
   }
 
@@ -77,7 +95,7 @@ export class SessionsController {
       .max(25)
       .parse(ids?.split(","));
     const rows = await this.db.session.findMany({
-      where: { id: { in: page } },
+      where: { id: { in: page }, parentSessionId: null },
       select: {
         id: true,
         evalId: true,
@@ -85,6 +103,8 @@ export class SessionsController {
         harness: true,
         status: true,
         createdAt: true,
+        origin: true,
+        memo: true,
         durationMs: true,
         costUsd: true,
         verdict: true,
@@ -99,13 +119,18 @@ export class SessionsController {
     const byId = new Map(
       criteria.map((row) => [row.id, JSON.parse(row.criteria ?? "[]")]),
     );
-    const counts = await this.interceptedCalls(page);
+    const rootIds = rows.map((row) => row.id);
+    const [counts, branchCounts] = await Promise.all([
+      this.interceptedCalls(rootIds),
+      this.branchCounts(rootIds),
+    ]);
     const order = new Map(page.map((id, index) => [id, index]));
     return rows
       .sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0))
       .map((row) => ({
         ...row,
         interceptedCalls: counts.get(row.id) ?? 0,
+        branchCount: branchCounts.get(row.id) ?? 0,
         criteria: byId.get(row.id),
       }));
   }
@@ -121,6 +146,44 @@ export class SessionsController {
 
     const counts = await this.interceptedCalls([id]);
     return { ...session, interceptedCalls: counts.get(id) ?? 0 };
+  }
+
+  @Get(":id/branches")
+  async branches(@Param("id") id: string) {
+    const current = await this.db.session.findUniqueOrThrow({
+      where: { id },
+      select: { rootSessionId: true },
+    });
+    const root = current.rootSessionId ?? id;
+    const rows = await this.db.$queryRaw<
+      {
+        id: string;
+        parentSessionId: string | null;
+        branchEntryId: string | null;
+        status: string;
+        createdAt: Date;
+        costUsd: number | null;
+        prompt: string;
+        change: string | null;
+        entryLabel: string;
+        passed: bigint;
+        assessed: bigint;
+      }[]
+    >`SELECT s.id, s.parentSessionId, s.branchEntryId, s.status, s.createdAt, s.costUsd,
+      substr(coalesce(json_extract(s.snapshot,'$.editedStart.label'),json_extract(s.snapshot,'$.evaluation.prompt')),1,160) AS prompt,
+      coalesce(json_extract(s.snapshot,'$.editedStart.label'),'Initial prompt') AS entryLabel,
+      CASE WHEN s.parentSessionId IS NOT NULL AND json_type(s.snapshot,'$.editedStart') IS NULL
+        THEN substr(json_extract(s.snapshot,'$.evaluation.prompt'),1,160)
+        ELSE json_extract(s.snapshot,'$.editedStart.change') END AS change,
+      COUNT(CASE WHEN d.passed=1 THEN 1 END) AS passed, COUNT(d.id) AS assessed
+      FROM Session s LEFT JOIN SessionDecision d ON d.sessionId=s.id
+      WHERE s.id=${root} OR s.rootSessionId=${root}
+      GROUP BY s.id ORDER BY s.rowid`;
+    return rows.map((row) => ({
+      ...row,
+      passed: Number(row.passed),
+      assessed: Number(row.assessed),
+    }));
   }
 
   @Get(":id/events")

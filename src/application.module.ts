@@ -21,6 +21,7 @@ import { ResourcesController } from "./http/resources-controller.js";
 import { SessionsController } from "./http/sessions-controller.js";
 import { SettingsController } from "./http/settings-controller.js";
 import { ToolCallsController } from "./http/tool-calls-controller.js";
+import { TraceEditsController } from "./http/trace-edits-controller.js";
 import { Database } from "./infrastructure/database.js";
 import {
   DecisionModel,
@@ -31,6 +32,10 @@ import {
   JevDecisionModel,
   OpenRouterLlm,
 } from "./overrides/infrastructure/model-providers.js";
+import {
+  PreviewModel,
+  PreviewSession,
+} from "./sessions/application/preview-session.js";
 import { SessionQueue } from "./sessions/application/session-queue.js";
 import { SessionWorker } from "./sessions/application/session-worker.js";
 import { StartSessions } from "./sessions/application/start-sessions.js";
@@ -38,6 +43,7 @@ import { SessionRepository } from "./sessions/domain/session-repository.js";
 import { WorkspaceRuntimeFactory } from "./sessions/domain/workspace-runtime.js";
 import { WorkspaceStore } from "./sessions/domain/workspace-store.js";
 import { ArtifactStore } from "./sessions/infrastructure/artifact-store.js";
+import { NativePreviewModel } from "./sessions/infrastructure/native-preview-model.js";
 import { PrismaSessionRepository } from "./sessions/infrastructure/prisma-session-repository.js";
 import { DefaultWorkspaceRuntimeFactory } from "./sessions/infrastructure/workspace-runtime-factory.js";
 import { SettingsService } from "./settings/application/settings-service.js";
@@ -63,6 +69,8 @@ import { PrismaSettingsRepository } from "./settings/infrastructure/prisma-setti
     ModelRewriter,
     { provide: DecisionModel, useClass: JevDecisionModel },
     { provide: SingleCallLlm, useClass: OpenRouterLlm },
+    { provide: PreviewModel, useClass: NativePreviewModel },
+    PreviewSession,
     SessionWorker,
     SessionQueue,
     SettingsService,
@@ -89,6 +97,7 @@ import { PrismaSettingsRepository } from "./settings/infrastructure/prisma-setti
     FilesystemController,
     ResourcesController,
     SessionsController,
+    TraceEditsController,
     ToolCallsController,
     SettingsController,
   ],

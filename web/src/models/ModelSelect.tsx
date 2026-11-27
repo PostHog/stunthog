@@ -8,7 +8,7 @@ export function ModelSelect({
   value,
   onChange,
 }: {
-  harness?: Harness;
+  harness?: Pick<Harness, "models">;
   value: string;
   onChange: (model: string) => void;
 }) {

@@ -6,14 +6,18 @@ import { resolveDataDirectory } from "../../infrastructure/data-directory.js";
 let runtime: Promise<ModelRuntime> | undefined;
 
 // The bundled SDK catalog supplies model IDs without spending credits or reading user logins.
-export async function providerModels(provider: Provider) {
+export function catalogRuntime() {
   runtime ??= ModelRuntime.create({
     authPath: join(resolveDataDirectory(), "catalog-auth.json"),
     modelsPath: null,
     allowModelNetwork: false,
   });
 
-  return (await runtime)
+  return runtime;
+}
+
+export async function providerModels(provider: Provider) {
+  return (await catalogRuntime())
     .getModels(provider)
     .map((model) => ({ id: model.id, name: model.name }));
 }

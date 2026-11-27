@@ -70,53 +70,61 @@ export function ConfigurationPanel({ session }: { session: Session }) {
           This session uses revision {evaluation.revision}. Later edits do not
           change these settings.
         </p>
-        <dl className="configuration-fields">
-          <div>
-            <dt>Environment</dt>
-            <dd>{environment?.title ?? "Empty workspace"}</dd>
-          </div>
-          <div>
-            <dt>Execution engine</dt>
-            <dd>
-              {environment?.executionMode === "docker" ? "Docker" : "Local"}
-            </dd>
-          </div>
-          <div>
-            <dt>Workspace source</dt>
-            <dd>
-              {environment?.repositoryUrl ??
-                environment?.workspacePath ??
-                "Empty workspace"}
-            </dd>
-          </div>
-          {environment?.executionMode === "docker" && (
+        {session.origin !== "organic" && (
+          <dl className="configuration-fields">
             <div>
-              <dt>Dockerfile</dt>
+              <dt>Environment</dt>
+              <dd>{environment?.title ?? "Empty workspace"}</dd>
+            </div>
+            <div>
+              <dt>Execution engine</dt>
               <dd>
-                {environment.dockerfilePath ??
-                  (environment.dockerfileContent
-                    ? "Inline Dockerfile"
-                    : "Built-in image")}
+                {environment?.executionMode === "docker" ? "Docker" : "Local"}
               </dd>
             </div>
-          )}
-        </dl>
+            <div>
+              <dt>Workspace source</dt>
+              <dd>
+                {environment?.repositoryUrl ??
+                  environment?.workspacePath ??
+                  "Empty workspace"}
+              </dd>
+            </div>
+            {environment?.executionMode === "docker" && (
+              <div>
+                <dt>Dockerfile</dt>
+                <dd>
+                  {environment.dockerfilePath ??
+                    (environment.dockerfileContent
+                      ? "Inline Dockerfile"
+                      : "Built-in image")}
+                </dd>
+              </div>
+            )}
+          </dl>
+        )}
       </section>
       <section className="configuration-group">
         <h2>Agent</h2>
         <ModelReference harness={session.harness} model={session.model} />
-        <dl className="configuration-fields">
-          <div>
-            <dt>Persona</dt>
-            <dd>
-              {persona?.title ?? "None"}
-              {persona && (
-                <p className="preserve-lines">{persona.description}</p>
-              )}
-            </dd>
-          </div>
-        </dl>
-        <Resources skills={snapshot.skills} mcps={snapshot.mcps} />
+        {session.origin === "organic" ? (
+          <p className="muted">The agent ran outside this evaluation.</p>
+        ) : (
+          <>
+            <dl className="configuration-fields">
+              <div>
+                <dt>Persona</dt>
+                <dd>
+                  {persona?.title ?? "None"}
+                  {persona && (
+                    <p className="preserve-lines">{persona.description}</p>
+                  )}
+                </dd>
+              </div>
+            </dl>
+            <Resources skills={snapshot.skills} mcps={snapshot.mcps} />
+          </>
+        )}
       </section>
       <section className="configuration-group">
         <h2>Judge</h2>

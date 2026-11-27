@@ -19,7 +19,9 @@ export function SessionJudgment({ session }: { session: Session }) {
       <p>
         {session.verdict ??
           (isActive(session)
-            ? "The judge assesses this session after the agent finishes."
+            ? session.origin === "organic"
+              ? "Waiting for the judge to assess the session file."
+              : "The judge assesses this session after the agent finishes."
             : "No judgment is available. Check the session error and logs.")}
       </p>
       {session.snapshot.evaluation.criteria.map((criterion, index) => {
@@ -60,8 +62,10 @@ export function SessionJudgment({ session }: { session: Session }) {
         );
       })}
       <p className="muted">
-        Usage includes the task agent and judge. Cost availability depends on
-        the harness.
+        {session.origin === "organic"
+          ? "Usage covers the judge for this import."
+          : "Usage includes the task agent and judge."}{" "}
+        Cost availability depends on the harness.
       </p>
     </aside>
   );

@@ -133,6 +133,14 @@ export async function createSession(request: HarnessRequest) {
       model,
       effort: session.thinkingLevel,
       tools: session.getActiveToolNames(),
+      toolSchemas: session
+        .getAllTools()
+        .filter((tool) => session.getActiveToolNames().includes(tool.name))
+        .map(({ name, description, parameters }) => ({
+          name,
+          description,
+          parameters,
+        })),
       systemPrompt: session.systemPrompt,
       skills: resourceLoader.getSkills().skills,
       settings: settingsManager.getSettings(),

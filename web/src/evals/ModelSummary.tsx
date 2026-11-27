@@ -5,12 +5,14 @@ import type { ModelSettingsData } from "../types.js";
 export function ModelSummary({
   value,
   judge,
+  synthetic,
   label,
   onEdit,
   onRemove,
 }: {
   value: ModelSettingsData;
   judge?: boolean;
+  synthetic?: boolean;
   label: string;
   onEdit: () => void;
   onRemove?: () => void;
@@ -20,6 +22,7 @@ export function ModelSummary({
       <div className="model-summary-info">
         <ModelReference harness={value.harness} model={value.model} />
         <p className="muted">
+          {synthetic && "Synthetic · "}
           {value.harness} · {value.effort} effort · {value.maxTurns} turns ·{" "}
           {value.timeoutSeconds}s timeout
         </p>

@@ -21,6 +21,7 @@ export interface ShellOptions {
 }
 
 export interface HarnessRuntime {
+  readonly imageId?: string;
   readonly kind: "local" | "docker";
   filePath?(path: string): string;
   process(command: ProcessCommand, cwd: string): Promise<ProcessCommand>;

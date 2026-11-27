@@ -13,11 +13,16 @@ import { EvaluationsService } from "../src/evaluations/application/evaluations-s
 import { ModelSettings } from "../src/evaluations/domain/model-settings.js";
 import { PrismaEvaluationRepository } from "../src/evaluations/infrastructure/prisma-evaluation-repository.js";
 import type { Harness } from "../src/harnesses/domain/harness.js";
-import type { HarnessRegistry } from "../src/harnesses/domain/harness-registry.js";
+import { HarnessRegistry } from "../src/harnesses/domain/harness-registry.js";
+import { ApiErrorFilter } from "../src/http/api-error-filter.js";
 import { SessionsController } from "../src/http/sessions-controller.js";
 import { Database } from "../src/infrastructure/database.js";
 import { migrateDatabase } from "../src/infrastructure/migrations.js";
 import type { ResponseRule } from "../src/overrides/domain/response-override.js";
+import {
+  PreviewModel,
+  PreviewSession,
+} from "../src/sessions/application/preview-session.js";
 import { SessionQueue } from "../src/sessions/application/session-queue.js";
 import { SessionWorker } from "../src/sessions/application/session-worker.js";
 import { StartSessions } from "../src/sessions/application/start-sessions.js";
@@ -113,6 +118,7 @@ async function verifyApplicationPersistence() {
     await assert.rejects(catalog.delete("persona", persona.value.id));
 
     let judgeCalls = 0;
+    const agentPrompts = new Map<string, string>();
     const drift = {
       callId: "docs-1",
       outcome: "observed",
@@ -142,6 +148,7 @@ async function verifyApplicationPersistence() {
           assert.match(input.prompt, /Wrote updated SDK to app.ts/);
           judgeCalls++;
         } else {
+          agentPrompts.set(input.label, input.prompt);
           assert.deepEqual(input.responseOverrides, expectedRules);
           assert.match(input.persona ?? "", /Verify all changes/);
           assert.equal(
@@ -291,7 +298,7 @@ async function verifyApplicationPersistence() {
       where: { batchId: baseline.batchId },
     });
     assert.ok(!JSON.stringify(oldSession.snapshot).includes(shellRule.id));
-    const batch = await starter.start(evaluation.id);
+    const batch = await starter.start(evaluation.id, undefined, true);
 
     for (let attempt = 0; attempt < 500; attempt++) {
       const pending = await db.session.count({
@@ -407,9 +414,201 @@ async function verifyApplicationPersistence() {
 
     const app = await NestFactory.create(ApplicationModule, { logger: false });
 
+    // biome-ignore lint/correctness/useHookAtTopLevel: This method configures the Nest server.
+    app.useGlobalFilters(new ApiErrorFilter());
     await app.init();
     try {
       const controller = app.get(SessionsController);
+      // Exercise the browser upload route with a judge that cannot run an agent or contact a provider.
+      const judgePrompts: string[] = [];
+      const importJudge: Harness = {
+        ...adapter,
+        run: async (input) => {
+          assert.equal(input.label, "judge");
+          judgePrompts.push(input.prompt);
+          const criteria = /^Criteria: (.+)$/m.exec(input.prompt)?.[1];
+          assert.ok(criteria);
+          return {
+            label: input.label,
+            status: "completed",
+            durationMs: 1,
+            text: JSON.stringify({
+              summary: "Verified the version",
+              decisions: (JSON.parse(criteria) as { id: string }[]).map(
+                (c) => ({
+                  criterionId: c.id,
+                  passed: true,
+                  feedback: "The tool returned version 1.",
+                }),
+              ),
+            }),
+            usage: {
+              input: 2,
+              output: 1,
+              cacheRead: 0,
+              cacheWrite: 0,
+              total: 3,
+              costUsd: 0.01,
+            },
+          };
+        },
+      };
+      Object.assign(app.get(HarnessRegistry), {
+        catalog: harnesses.catalog,
+        get: () => importJudge,
+      });
+      await app.listen(0, "127.0.0.1");
+      const uploadUrl = `${await app.getUrl()}/api/evals/${multi.id}/session-file`;
+      const upload = (body: FormData) =>
+        fetch(uploadUrl, { method: "POST", body });
+      const before = await db.session.count();
+      const form = new FormData();
+      form.set("memo", "A private memo");
+      assert.equal((await upload(form)).status, 400);
+      form.set("file", new Blob(["invalid"]), "log.jsonl");
+      assert.equal((await upload(form)).status, 400);
+      assert.equal(await db.session.count(), before);
+      const recorded = {
+        type: "assistant",
+        message: {
+          role: "assistant",
+          model: "recorded-model",
+          content: [
+            { type: "text", text: "The version is 1. test-secret" },
+            {
+              type: "tool_use",
+              id: "t1",
+              name: "Bash",
+              input: { command: "hog version" },
+            },
+          ],
+        },
+      };
+      form.set("file", new Blob([JSON.stringify(recorded)]), "log.jsonl");
+      const response = await upload(form);
+      const report = (await response.json()) as {
+        sessionIds: string[];
+        message?: string;
+      };
+      assert.equal(response.status, 201, report.message);
+      assert.equal(report.sessionIds.length, 1);
+      const importedId = report.sessionIds[0];
+      assert.ok(importedId);
+      for (let attempt = 0; attempt < 200; attempt++) {
+        const row = await controller.get(importedId);
+        if (!["queued", "running", "judging"].includes(row.status)) break;
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+      assert.equal(judgePrompts.length, 1);
+      assert.ok(judgePrompts[0]?.includes("The version is 1. [redacted]"));
+      assert.doesNotMatch(judgePrompts[0] ?? "", /A private memo|test-secret/);
+      const imported = await controller.get(importedId);
+      assert.equal(imported.status, "completed", imported.error ?? "");
+      assert.equal(imported.agentResult, null);
+      assert.equal(imported.decisions.length, multi.criteria.length);
+      assert.equal(imported.totalTokens, 3);
+      assert.equal(imported.costUsd, 0.01);
+      assert.equal(imported.harness, "claude");
+      assert.equal(imported.model, "recorded-model");
+      assert.equal(imported.origin, "organic");
+      assert.equal(
+        (await controller.historyPage(importedId))[0]?.memo,
+        "A private memo",
+      );
+      assert.deepEqual(
+        (await controller.files(importedId))
+          .filter((f) => f.phase !== "judge-runtime")
+          .map((f) => [f.phase, f.path]),
+        [["session-file", "log.jsonl"]],
+      );
+      assert.equal(
+        await db.toolCall.count({
+          where: { sessionId: importedId, phase: "agent", name: "Bash" },
+        }),
+        1,
+      );
+      const createUrl = `${await app.getUrl()}/api/evals/with-session-files`;
+      const createForm = new FormData();
+      const definition = {
+        title: "Organic installation",
+        prompt: "Install the CLI",
+        criteria: [{ description: "Reports version 1" }],
+        models: [],
+        judge: model,
+      };
+      createForm.set("evaluation", JSON.stringify(definition));
+      createForm.set(
+        "memos",
+        JSON.stringify(["First installation", "Second installation"]),
+      );
+      const sample = new Blob([JSON.stringify(recorded)]);
+      createForm.append("files", sample, "first.jsonl");
+      createForm.append("files", new Blob(["invalid"]), "second.jsonl");
+      const evalCount = await db.eval.count();
+      assert.equal(
+        (await fetch(createUrl, { method: "POST", body: createForm })).status,
+        400,
+      );
+      assert.equal(await db.eval.count(), evalCount);
+      assert.equal(await db.session.count(), before + 1);
+      createForm.delete("files");
+      createForm.append("files", sample, "first.jsonl");
+      createForm.append("files", sample, "second.jsonl");
+      const createResponse = await fetch(createUrl, {
+        method: "POST",
+        body: createForm,
+      });
+      const created = (await createResponse.json()) as {
+        id: string;
+        models: unknown[];
+        message?: string;
+      };
+      assert.equal(createResponse.status, 201, created.message);
+      assert.deepEqual(created.models, []);
+      const loaded = await controller.list(created.id);
+      assert.deepEqual(loaded.map((s) => s.memo).sort(), [
+        "First installation",
+        "Second installation",
+      ]);
+      assert.ok(
+        loaded.every(
+          (s) => s.origin === "organic" && s.batchId === loaded[0]?.batchId,
+        ),
+      );
+      for (let attempt = 0; attempt < 200; attempt++) {
+        if (
+          (await controller.list(created.id)).every(
+            (s) => s.status === "completed",
+          )
+        )
+          break;
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+      assert.ok(
+        (await controller.list(created.id)).every(
+          (s) => s.status === "completed" && s.decisions[0]?.passed,
+        ),
+      );
+      const runUrl = `${await app.getUrl()}/api/evals/${created.id}/run`;
+      const emptyRun = await fetch(runUrl, { method: "POST" });
+      assert.equal(emptyRun.status, 400);
+      assert.match(await emptyRun.text(), /Add a model/);
+      assert.equal((await controller.list(created.id)).length, 2);
+      assert.deepEqual(
+        new Set((await controller.list(multi.id)).map((s) => s.origin)),
+        new Set(["synthetic", "organic"]),
+      );
+      await migrateDatabase(data);
+      const reopened = new Database();
+      try {
+        const persisted = await reopened.session.findUniqueOrThrow({
+          where: { id: importedId },
+        });
+        assert.equal(persisted.memo, "A private memo");
+        assert.equal(persisted.origin, "organic");
+      } finally {
+        await reopened.$disconnect();
+      }
       const s = saved[0];
       assert.ok(s);
       const capture = {
@@ -464,6 +663,305 @@ async function verifyApplicationPersistence() {
           item.id === s.id ? 3 : 1,
         );
       }
+
+      // A branch owns its inputs and judgment, even after the source folder and evaluation change.
+      Object.assign(app.get(HarnessRegistry), harnesses);
+      const root = saved[0];
+      assert.ok(root);
+      const prefix = `${await app.getUrl()}/api/sessions/`;
+      const post = async (path: string, body: unknown) =>
+        fetch(prefix + path, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+      let previews = 0;
+      const modelPort: PreviewModel = {
+        models: async () => [{ id: "test-model", name: "Test model" }],
+        next: async (provider, selected, messages) => {
+          previews++;
+          assert.equal(provider, "openrouter");
+          assert.equal(selected, "test-model");
+          assert.equal(messages.at(-1)?.content, "Try the CLI");
+          assert.ok(!JSON.stringify(messages).includes("Wrote updated SDK"));
+          return {
+            action: { kind: "tool", text: 'bash {"command":"hog --version"}' },
+            model: selected,
+            tokens: 9,
+            cost: null,
+          };
+        },
+      };
+      Object.assign(app.get(PreviewModel), modelPort);
+      const edit = {
+        field: "text",
+        entryId: "initial-prompt",
+        replacement: "Try the CLI",
+      };
+      const n = await db.session.count();
+      const preview = await post(`${root.id}/previews`, {
+        edit,
+        model: "test-model",
+      });
+      assert.equal(preview.status, 201);
+      assert.equal(
+        ((await preview.json()) as { action: { kind: string } }).action.kind,
+        "tool",
+      );
+      assert.equal(previews, 1);
+      assert.equal(await db.session.count(), n);
+      const importedPoint = await app.get(PreviewSession).point(
+        importedId,
+        (
+          await import("../src/sessions/domain/transcript/transcript.js")
+        ).buildTranscript(
+          await db.sessionEvent.findMany({
+            where: { sessionId: importedId, phase: "agent" },
+            orderBy: { sequence: "asc" },
+          }),
+        )[0]?.id ?? "",
+      );
+      assert.equal(importedPoint.canBranch, false);
+      const key = crypto.randomUUID();
+      const request = {
+        entryId: "initial-prompt",
+        prompt: "Run the CLI",
+        confirmLiveTools: true,
+        requestId: key,
+      };
+      assert.equal(
+        (
+          await post(`${root.id}/branches`, {
+            ...request,
+            confirmLiveTools: false,
+          })
+        ).status,
+        400,
+      );
+      assert.equal(
+        (await post(`${root.id}/branches`, { ...request, entryId: "missing" }))
+          .status,
+        400,
+      );
+      await writeFile(join(f.workspace, "app.ts"), "source has changed");
+      const started = await post(`${root.id}/branches`, request);
+      assert.equal(
+        started.status,
+        201,
+        started.status === 201 ? "" : await started.text(),
+      );
+      const { id } = (await started.json()) as { id: string };
+      const repeated = await post(`${root.id}/branches`, request);
+      assert.deepEqual(await repeated.json(), { id });
+      assert.deepEqual(
+        await (await fetch(`${prefix + id}/starting-point`)).json(),
+        {
+          kind: "user-message",
+          before: evaluation.prompt,
+          after: request.prompt,
+        },
+      );
+      for (let i = 0; i < 300; i++) {
+        const row = await controller.get(id);
+        if (!["queued", "running", "judging"].includes(row.status)) break;
+        await new Promise((r) => setTimeout(r, 10));
+      }
+      const child = await controller.get(id);
+      assert.equal(child.parentSessionId, root.id);
+      assert.equal(child.rootSessionId, root.id);
+      assert.equal(child.batchId, root.batchId);
+      assert.equal(child.status, "completed", child.error ?? "");
+      assert.equal(child.costUsd, 0.02);
+      assert.equal(child.decisions.length, 1);
+      assert.equal((await controller.get(root.id)).costUsd, 0.02);
+      assert.match(JSON.stringify(child.snapshot), /Run the CLI/);
+      const family = await controller.branches(id);
+      assert.deepEqual(
+        family.map((s) => s.id),
+        [root.id, id],
+      );
+      assert.equal(family[1]?.prompt, "Run the CLI");
+      assert.equal(family[1]?.assessed, 1);
+      assert.ok(
+        !(await controller.list(root.evalId)).some((row) => row.id === id),
+      );
+      assert.equal(
+        (await controller.list(root.evalId)).find((row) => row.id === root.id)
+          ?.branchCount,
+        1,
+      );
+      assert.equal(
+        await readFile(join(f.workspace, "app.ts"), "utf8"),
+        "source has changed",
+      );
+      const grand = await post(`${id}/branches`, {
+        ...request,
+        prompt: "Read the version",
+        requestId: crypto.randomUUID(),
+      });
+      assert.equal(grand.status, 201);
+      const grandId = ((await grand.json()) as { id: string }).id;
+      assert.equal((await controller.get(grandId)).rootSessionId, root.id);
+      assert.equal((await controller.get(grandId)).parentSessionId, id);
+      const branchIds = new Set([id, grandId]);
+      for (const rows of [
+        await controller.list(),
+        await controller.list(root.evalId),
+        await controller.history(),
+        await controller.historyPage([root.id, id, grandId].join(",")),
+      ]) {
+        assert.ok(rows.some((row) => row.id === root.id));
+        assert.ok(rows.every((row) => !branchIds.has(row.id)));
+      }
+      assert.equal((await controller.historyPage(root.id))[0]?.branchCount, 2);
+      const reopenedBranches = new Database();
+      try {
+        const branch = await reopenedBranches.session.findUniqueOrThrow({
+          where: { id },
+          select: {
+            rootSessionId: true,
+            promptCheckpointReady: true,
+            artifacts: { where: { phase: "input", path: "workspace/app.ts" } },
+          },
+        });
+        assert.equal(branch.rootSessionId, root.id);
+        assert.equal(branch.promptCheckpointReady, true);
+        assert.ok(branch.artifacts[0]);
+        assert.notEqual(
+          Buffer.from(branch.artifacts[0].content).toString(),
+          "source has changed",
+        );
+      } finally {
+        await reopenedBranches.$disconnect();
+      }
+
+      // Older recordings can start an independent harness with a revised tool result.
+      const historical = saved[1];
+      assert.ok(historical);
+      await db.session.update({
+        where: { id: historical.id },
+        data: { promptCheckpointReady: false },
+      });
+      await sessions.event(historical.id, "agent", {
+        type: "tool_execution_start",
+        toolName: "bash",
+        toolCallId: "version",
+        args: { command: "hog --version" },
+      });
+      await sessions.event(historical.id, "agent", {
+        type: "tool_execution_end",
+        toolName: "bash",
+        toolCallId: "version",
+        result: { content: [{ type: "text", text: "stale version" }] },
+      });
+      await sessions.event(historical.id, "agent", {
+        type: "assistant",
+        message: { content: "Later parent reply" },
+      });
+      const full = {
+        edit: {
+          entryId: "tool-version",
+          field: "result",
+          replacement: "CLI version 22",
+        },
+        model: "test-model",
+        requestId: crypto.randomUUID(),
+        confirmLiveTools: true,
+      };
+      const url = `${historical.id}/branches`;
+      const rejectedCount = await db.session.count();
+      assert.equal(
+        (await post(url, { ...full, model: "unknown" })).status,
+        400,
+      );
+      assert.equal(
+        (
+          await post(url, {
+            ...full,
+            edit: { ...full.edit, replacement: "test-secret" },
+          })
+        ).status,
+        400,
+      );
+      assert.equal(await db.session.count(), rejectedCount);
+      const launched = await post(url, full);
+      assert.equal(
+        launched.status,
+        201,
+        launched.status === 201 ? "" : await launched.text(),
+      );
+      const branchId = ((await launched.json()) as { id: string }).id;
+      assert.deepEqual(
+        await (await fetch(`${prefix + branchId}/starting-point`)).json(),
+        {
+          kind: "tool-result",
+          before: "stale version",
+          after: "CLI version 22",
+        },
+      );
+      assert.deepEqual(await (await post(url, full)).json(), { id: branchId });
+      assert.equal(
+        (
+          await post(url, {
+            ...full,
+            edit: { ...full.edit, replacement: "Different" },
+          })
+        ).status,
+        400,
+      );
+      for (let i = 0; i < 300; i++) {
+        const branch = await controller.get(branchId);
+        if (!["queued", "running", "judging"].includes(branch.status)) break;
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+      const ran = await controller.get(branchId);
+      assert.equal(ran.status, "completed", ran.error ?? "");
+      assert.equal(ran.harness, historical.harness);
+      assert.equal(ran.parentSessionId, historical.id);
+      assert.equal(
+        (await controller.branches(historical.id)).find(
+          (n) => n.id === branchId,
+        )?.change,
+        full.edit.replacement,
+      );
+      assert.equal(ran.decisions.length, 1);
+      assert.match(agentPrompts.get(branchId) ?? "", /CLI version 22/);
+      assert.doesNotMatch(
+        agentPrompts.get(branchId) ?? "",
+        /Later parent reply|stale version/,
+      );
+      assert.match(
+        JSON.stringify(await sessions.background(branchId)),
+        /CLI version 22/,
+      );
+      assert.equal(
+        (await controller.list(historical.evalId)).some(
+          (s) => s.id === branchId,
+        ),
+        false,
+      );
+      assert.ok(
+        (await controller.files(branchId)).some(
+          (f) => f.phase === "output" && f.path === "app.ts",
+        ),
+      );
+
+      // An import supplies conversation history and has no original input workspace.
+      const organic = await app.get(PreviewSession).prepareFullSession(
+        importedId,
+        {
+          entryId: `message-1-text-0`,
+          field: "text",
+          replacement: "The CLI is missing.",
+        },
+        "claude-test",
+      );
+      assert.equal(organic.start.settings.harness, "claude");
+      assert.equal(organic.start.workspace, "empty");
+      assert.match(
+        JSON.stringify(organic.start.background),
+        /The CLI is missing/,
+      );
     } finally {
       await app.close();
     }

@@ -6,6 +6,12 @@ import { type Judgment, parseJudgment } from "./judgment.js";
 
 export type { Judgment } from "./judgment.js";
 
+type AgentModel =
+  | Readonly<ModelSettingsData>
+  | Readonly<
+      Pick<ModelSettingsData, "harness" | "model"> & { origin: "organic" }
+    >;
+
 export type SessionStatus =
   | "queued"
   | "running"
@@ -21,11 +27,15 @@ export class Session {
   private assessment: Judgment | null = null;
   private failure: string | null = null;
   private readonly configuration: EvaluationData;
-  readonly model: Readonly<ModelSettingsData>;
+  readonly model: AgentModel;
 
-  constructor(evaluation: EvaluationData, model: Readonly<ModelSettingsData>) {
+  constructor(evaluation: EvaluationData, model: AgentModel) {
     this.configuration = structuredClone(evaluation);
     this.model = Object.freeze(structuredClone(model));
+  }
+
+  get origin() {
+    return "origin" in this.model ? this.model.origin : "synthetic";
   }
 
   get status(): SessionStatus {

@@ -1,0 +1,2 @@
+ALTER TABLE "Session" ADD COLUMN "origin" TEXT NOT NULL DEFAULT 'synthetic';
+ALTER TABLE "Session" ADD COLUMN "memo" TEXT;

@@ -18,6 +18,7 @@ import type {
 import { EvalCriteria } from "./EvalCriteria.js";
 import { EvalModels } from "./EvalModels.js";
 import { EvalResources } from "./EvalResources.js";
+import type { PendingSessionFile } from "./LoadSessionDialog.js";
 import {
   missingJudgeMcpTools,
   withJudgeMcpSupport,
@@ -48,7 +49,8 @@ function ExistingEditor({ id }: { id: string }) {
 }
 
 // Drafts belong to this tab and the revision the author opened.
-const drafts = new Map<string, EvalDraft>();
+type EditorDraft = EvalDraft & { files?: PendingSessionFile[] };
+const drafts = new Map<string, EditorDraft>();
 function Editor({
   initial,
   defaults,
@@ -59,7 +61,7 @@ function Editor({
   const draftKey = initial
     ? `${initial.id}/${initial.revision}`
     : `new/${JSON.stringify(defaults)}`;
-  const [value, update] = useState<EvalDraft>(
+  const [value, update] = useState<EditorDraft>(
     () =>
       drafts.get(draftKey) ??
       initial ?? {
@@ -88,7 +90,7 @@ function Editor({
     error: harnessError,
     refresh: refreshHarnesses,
   } = useApi<Harness[]>("/harnesses");
-  function setValue(next: EvalDraft) {
+  function setValue(next: EditorDraft) {
     drafts.set(draftKey, next);
     update(next);
   }
@@ -98,8 +100,15 @@ function Editor({
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
 
+  const syntheticCount = value.models.reduce(
+    (sum, model) => sum + model.count,
+    0,
+  );
+  const fileCount = value.files?.length ?? 0;
+
   async function save(event: FormEvent) {
     event.preventDefault();
+    if (saving) return;
 
     if (!value.criteria.length) {
       setError("Add at least one criterion before saving the evaluation.");
@@ -112,8 +121,8 @@ function Editor({
       return;
     }
 
-    if (!value.models.length) {
-      setError("Add at least one model before saving the evaluation.");
+    if (!initial && !value.models.length && !value.files?.length) {
+      setError("Add a model or load a session file.");
 
       return;
     }
@@ -148,11 +157,21 @@ function Editor({
     setError("");
 
     try {
-      const { id: _id, ...input } = { ...value, id: initial?.id };
-      const saved = await api<EvaluationData>(
-        initial ? `/evals/${initial.id}` : "/evals",
-        { method: initial ? "PUT" : "POST", body: JSON.stringify(input) },
-      );
+      const { id: _id, files, ...input } = { ...value, id: initial?.id };
+      let path = initial ? `/evals/${initial.id}` : "/evals";
+      let body: FormData | string = JSON.stringify(input);
+      if (files?.length) {
+        const form = new FormData();
+        form.set("evaluation", body);
+        form.set("memos", JSON.stringify(files.map((entry) => entry.memo)));
+        for (const entry of files) form.append("files", entry.file);
+        path = "/evals/with-session-files";
+        body = form;
+      }
+      const saved = await api<EvaluationData>(path, {
+        method: initial ? "PUT" : "POST",
+        body,
+      });
 
       drafts.delete(draftKey);
       location.hash = `evals/${saved.id}`;
@@ -180,7 +199,7 @@ function Editor({
         />
       </PageTitle>
       <p className="description">
-        Define the task, criteria, and models for this evaluation.
+        Define the task and the criteria the judge will check.
       </p>
       <Notice error={resourceError || harnessError} />
       {harnessError && (
@@ -222,7 +241,13 @@ function Editor({
           value={value}
           onChange={(next) => setValue(withJudgeMcpSupport(next, harnesses))}
           harnesses={harnesses}
-          showDefaultsLink={!initial}
+          {...(!initial && {
+            recordings: {
+              files: value.files ?? [],
+              onChange: (files: PendingSessionFile[]) =>
+                setValue({ ...value, files }),
+            },
+          })}
         />
         <EvalResources
           value={value}
@@ -244,12 +269,15 @@ function Editor({
             <p className="section-note">
               {value.criteria.length}{" "}
               {value.criteria.length === 1 ? "criterion" : "criteria"} ·{" "}
-              {value.models.reduce(
-                (sum, model) =>
-                  sum + (Number.isFinite(model.count) ? model.count : 0),
-                0,
-              )}{" "}
-              sessions per run · one judgment per session
+              {syntheticCount} synthetic{" "}
+              {syntheticCount === 1 ? "session" : "sessions"} per run
+              {fileCount > 0 && (
+                <>
+                  {" "}
+                  · {fileCount} organic{" "}
+                  {fileCount === 1 ? "session" : "sessions"} to judge on save
+                </>
+              )}
             </p>
             <Button
               variant="primary"
@@ -257,7 +285,11 @@ function Editor({
               type="submit"
             >
               {saving && <StatusIcon name="spinner" />}
-              {saving ? "Saving..." : "Save evaluation"}
+              {saving
+                ? "Saving..."
+                : fileCount > 0
+                  ? `Save and judge ${fileCount === 1 ? "file" : "files"}`
+                  : "Save evaluation"}
             </Button>
           </div>
         </div>

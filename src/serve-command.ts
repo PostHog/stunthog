@@ -78,6 +78,7 @@ export class ServeCommand extends CommandRunner {
     console.log(
       `StuntHog: ${url}\nData directory: ${resolveDataDirectory()}\nPress Ctrl+C to stop.`,
     );
+    process.send?.("stunthog:listening");
 
     if (options.open !== false)
       await open(url).catch(() =>

@@ -27,7 +27,7 @@ const schema = z
     judgeMcpTools: z
       .record(z.string().uuid(), z.array(mcpToolName))
       .default({}),
-    models: z.array(z.unknown()).min(1),
+    models: z.array(z.unknown()),
     judge: z.unknown(),
     revision: z.number().int().positive(),
   })

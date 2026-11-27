@@ -22,6 +22,8 @@ import {
 } from "../components.js";
 import { ModelReference, useModelName } from "../models/ModelReference.js";
 import { EmptyState, RequestState } from "../PageState.js";
+import { StatusIcon } from "../status/StatusIcon.js";
+import { Tooltip } from "../Tooltip.js";
 import type { Session } from "../types.js";
 import { filterSessions, isActive } from "./session-filters.js";
 
@@ -43,6 +45,9 @@ type Summary = Pick<
   | "verdict"
   | "error"
   | "eval"
+  | "origin"
+  | "memo"
+  | "branchCount"
   | "interceptedCalls"
 > & {
   criteria: Session["snapshot"]["evaluation"]["criteria"];
@@ -165,6 +170,7 @@ function ResultTable({ filtered }: { filtered: Summary[] }) {
             <TableHeader>
               <TableRow>
                 <TableHead>Harness / model</TableHead>
+                <TableHead>Source</TableHead>
                 <TableHead>Evaluation</TableHead>
                 <TableHead>Criteria</TableHead>
                 <TableHead>Judge verdict</TableHead>
@@ -190,7 +196,27 @@ function ResultTable({ filtered }: { filtered: Summary[] }) {
                       >
                         View session
                       </a>
+                      {!!session.branchCount && (
+                        <>
+                          {" "}
+                          ·{" "}
+                          <a href={`#sessions/${session.id}?branches=1`}>
+                            {session.branchCount}{" "}
+                            {session.branchCount === 1 ? "branch" : "branches"}
+                          </a>
+                        </>
+                      )}
                     </small>
+                  </TableCell>
+                  <TableCell>
+                    <span className="status-note ph-no-capture">
+                      {session.origin === "organic" ? "Organic" : "Synthetic"}
+                      {session.memo && (
+                        <Tooltip text={session.memo}>
+                          <StatusIcon name="info" />
+                        </Tooltip>
+                      )}
+                    </span>
                   </TableCell>
                   <TableCell>
                     <a href={`#evals/${session.evalId}`}>

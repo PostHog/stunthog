@@ -174,6 +174,26 @@ test(
         /exec --interactive --workdir \/stunthog\/workspace --env-file/,
       );
       assert.match(calls, /rm --force container-test/);
+      assert.ok(runtime.imageId);
+      const branch = await new DefaultWorkspaceRuntimeFactory().create(
+        {
+          title: "Saved image",
+          executionMode: "docker",
+          workspacePath: null,
+          repositoryUrl: null,
+          dockerfilePath: null,
+          dockerfileContent: null,
+          restoredImage: runtime.imageId,
+        },
+        root,
+        workspace,
+        new AbortController().signal,
+        "codex",
+      );
+      await branch.close();
+      const restoreCalls = (await readFile(log, "utf8")).slice(calls.length);
+      assert.doesNotMatch(restoreCalls, /build --quiet/);
+      assert.match(restoreCalls, /--pull=never .*sha256:test/);
     } finally {
       if (previousKey === undefined) delete process.env.ANTHROPIC_API_KEY;
       else process.env.ANTHROPIC_API_KEY = previousKey;

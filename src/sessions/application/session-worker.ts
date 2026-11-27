@@ -20,6 +20,7 @@ import type { ExecutionSnapshot } from "../domain/execution-snapshot.js";
 import { judgingPrompt } from "../domain/judging-prompt.js";
 import type { Session } from "../domain/session.js";
 import { SessionRepository } from "../domain/session-repository.js";
+import { fullSessionPrompt } from "../domain/trace-edit.js";
 import { WorkspaceRuntimeFactory } from "../domain/workspace-runtime.js";
 import { WorkspaceStore } from "../domain/workspace-store.js";
 import { judgeSession } from "./judge-session.js";
@@ -63,92 +64,108 @@ export class SessionWorker {
       signal.throwIfAborted();
       session.start();
       await this.sessions.save(session);
-      await this.artifacts.restore(session.id, root, "input");
+      let evidence: string;
+      const background = snapshot.editedStart?.hasBackground
+        ? await this.sessions.background(session.id)
+        : [];
+      if ("origin" in session.model) {
+        evidence = JSON.stringify(
+          await this.sessions.events(session.id, "agent"),
+        );
+      } else {
+        await this.artifacts.restore(session.id, root, "input");
 
-      const workspace = join(root, "workspace");
-      const adapter = this.harnesses.get(session.model.harness);
+        const workspace = join(root, "workspace");
+        const adapter = this.harnesses.get(session.model.harness);
 
-      await mkdir(workspace, { recursive: true });
-      agentRuntime = await this.runtimes.create(
-        snapshot.environment,
-        root,
-        workspace,
-        signal,
-        adapter.id,
-      );
-
-      const skills = snapshot.skills.map((_, index) =>
-        join(root, "skills", String(index)),
-      );
-      if (adapter.id !== "pi") {
-        const { cp } = await import("node:fs/promises");
-        const skillRoot =
-          adapter.id === "claude"
-            ? ".claude/skills"
-            : adapter.id === "opencode"
-              ? ".opencode/skills"
-              : ".agents/skills";
-
-        for (const [index, path] of skills.entries())
-          await cp(path, join(workspace, skillRoot, `eval-${index}`), {
-            recursive: true,
-          });
-      }
-
-      const agentHarness = this.analytics
-        ? observedHarness(
-            adapter,
-            this.analytics.captureAi,
-            session.id,
-            "agent",
-          )
-        : adapter;
-      agent = await agentHarness.run(
-        await this.input(
-          session,
-          session.model,
+        await mkdir(workspace, { recursive: true });
+        agentRuntime = await this.runtimes.create(
+          snapshot.environment,
           root,
           workspace,
-          skills,
-          snapshot.evaluation.prompt,
-          snapshot,
           signal,
-          "agent",
-          agentRuntime,
-        ),
-      );
-      await this.artifacts.capture(session.id, workspace, "output");
-      await this.artifacts.capture(
-        session.id,
-        join(root, "agent"),
-        "agent-runtime",
-      );
-      await agentRuntime.close();
-      agentRuntime = undefined;
-      await this.sessions.save(session, agent);
-      signal.throwIfAborted();
-      const piMessages =
-        adapter.id === "pi"
-          ? await readFile(join(root, "agent", "messages.json"), "utf8").catch(
-              () => undefined,
-            )
-          : undefined;
-      const evidence =
-        piMessages ??
-        JSON.stringify(await this.sessions.events(session.id, "agent"));
-      if (
-        agent.status === "failed" &&
-        !agent.text.trim() &&
-        !hasAgentEvidence(evidence)
-      ) {
-        session.fail(
-          agent.error ?? "The agent stopped before it recorded any activity.",
+          adapter.id,
         );
+
+        const skills = snapshot.skills.map((_, index) =>
+          join(root, "skills", String(index)),
+        );
+        if (adapter.id !== "pi") {
+          const { cp } = await import("node:fs/promises");
+          const skillRoot =
+            adapter.id === "claude"
+              ? ".claude/skills"
+              : adapter.id === "opencode"
+                ? ".opencode/skills"
+                : ".agents/skills";
+
+          for (const [index, path] of skills.entries())
+            await cp(path, join(workspace, skillRoot, `eval-${index}`), {
+              recursive: true,
+            });
+        }
+
+        if (snapshot.promptCheckpoint || agentRuntime.imageId)
+          await this.sessions.markPromptCheckpoint(
+            session.id,
+            agentRuntime.imageId ?? null,
+          );
+        const agentHarness = this.analytics
+          ? observedHarness(
+              adapter,
+              this.analytics.captureAi,
+              session.id,
+              "agent",
+            )
+          : adapter;
+        agent = await agentHarness.run(
+          await this.input(
+            session,
+            session.model,
+            root,
+            workspace,
+            skills,
+            fullSessionPrompt(snapshot.evaluation.prompt, background),
+            snapshot,
+            signal,
+            "agent",
+            agentRuntime,
+          ),
+        );
+        await this.artifacts.capture(session.id, workspace, "output");
+        await this.artifacts.capture(
+          session.id,
+          join(root, "agent"),
+          "agent-runtime",
+        );
+        await agentRuntime.close();
+        agentRuntime = undefined;
         await this.sessions.save(session, agent);
-        return;
+        signal.throwIfAborted();
+        const piMessages =
+          adapter.id === "pi"
+            ? await readFile(
+                join(root, "agent", "messages.json"),
+                "utf8",
+              ).catch(() => undefined)
+            : undefined;
+        evidence =
+          piMessages ??
+          JSON.stringify(await this.sessions.events(session.id, "agent"));
+        if (
+          agent.status === "failed" &&
+          !agent.text.trim() &&
+          !hasAgentEvidence(evidence)
+        ) {
+          session.fail(
+            agent.error ?? "The agent stopped before it recorded any activity.",
+          );
+          await this.sessions.save(session, agent);
+          return;
+        }
       }
       session.beginJudging(
-        agent.status === "failed"
+        agent?.status === "failed"
           ? (agent.error ?? "The agent execution failed.")
           : null,
       );
@@ -171,7 +188,7 @@ export class SessionWorker {
         root,
         judgeWorkspace,
         [],
-        judgingPrompt(snapshot, agent, evidence, intercepts),
+        judgingPrompt(snapshot, agent, evidence, intercepts, background),
         snapshot,
         signal,
         "judge",
@@ -227,7 +244,9 @@ export class SessionWorker {
 
       for (const phase of session.status === "completed"
         ? []
-        : ["agent", "judge"]) {
+        : session.origin === "organic"
+          ? ["judge"]
+          : ["agent", "judge"]) {
         await this.artifacts
           .capture(session.id, join(root, phase), `${phase}-runtime`)
           .catch((error: unknown) =>
@@ -244,7 +263,8 @@ export class SessionWorker {
       this.analytics?.capture("agent session finished", {
         session_id: session.id,
         harness: session.model.harness,
-        model: session.model.model,
+        model: session.origin === "organic" ? "imported" : session.model.model,
+        origin: session.origin,
         status: session.status,
         criteria_passed: decisions.filter((decision) => decision.passed).length,
         criteria_total: decisions.length,

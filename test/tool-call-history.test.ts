@@ -85,6 +85,13 @@ test("previous sessions and live tool events share a durable, searchable call hi
         .behaviorDrift,
       null,
     );
+    assert.deepEqual(
+      await db.session.findUniqueOrThrow({
+        where: { id: session },
+        select: { origin: true, memo: true },
+      }),
+      { origin: "synthetic", memo: null },
+    );
     const history = new ToolCallsController(db);
     const found = await history.search({
       query: "analyti",
@@ -211,10 +218,45 @@ test("previous sessions and live tool events share a durable, searchable call hi
       match: "batch",
       command: "pwd",
     });
+    const branch = await db.session.create({
+      data: {
+        evalId: id,
+        batchId: "batch",
+        model: "example",
+        harness: "codex",
+        status: "completed",
+        parentSessionId: session,
+        rootSessionId: session,
+        snapshot,
+      },
+    });
+    await repo.event(branch.id, "agent", {
+      type: "item.completed",
+      item: {
+        id: "branch-command",
+        type: "command_execution",
+        command: "pwd",
+        aggregated_output: "branch-only-output",
+        exit_code: 0,
+      },
+    });
+    assert.equal(
+      (await history.search({ query: "branch-only-output" })).calls.length,
+      0,
+    );
+    assert.equal(
+      (
+        await history.search({
+          query: "branch-only-output",
+          sessionId: branch.id,
+        })
+      ).calls[0]?.sessionId,
+      branch.id,
+    );
     await db.$disconnect();
     await migrateDatabase(data);
     db = new Database();
-    assert.equal(await db.toolCall.count(), 4);
+    assert.equal(await db.toolCall.count(), 5);
     assert.equal(
       (await new ToolCallsController(db).search({ query: "Router" })).calls
         .length,

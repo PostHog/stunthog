@@ -105,9 +105,11 @@ export function UsageSummary({ sessions }: { sessions: Session[] }) {
         </span>
       </div>
       <p className="muted">
-        Includes task agents and judges. Cost available for {priced}/
-        {executions} executions. Missing usage is not zero usage. Provider
-        prices can differ from these estimates.
+        {sessions.every((s) => s.origin === "organic")
+          ? "Usage covers the judge for this import."
+          : "Includes task agents and judges."}{" "}
+        Cost available for {priced}/{executions} executions. Missing usage is
+        not zero usage. Provider prices can differ from these estimates.
       </p>
       <Collapsible>
         <CollapsibleTrigger>Usage by harness and model</CollapsibleTrigger>

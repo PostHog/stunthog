@@ -35,25 +35,41 @@ export function SessionMetadata({ session }: { session: Session }) {
   return (
     <dl className="session-metadata">
       <div>
-        <DetailLabel icon={IconPerson}>Persona</DetailLabel>
-        <dd>{snapshot.persona?.title ?? "None"}</dd>
+        <DetailLabel icon={IconFolder}>Source</DetailLabel>
+        <dd>{session.origin === "organic" ? "Organic" : "Synthetic"}</dd>
       </div>
+      {session.memo && (
+        <div>
+          <DetailLabel icon={IconFolder}>Memo</DetailLabel>
+          <dd>{session.memo}</dd>
+        </div>
+      )}
+      {session.origin !== "organic" && (
+        <>
+          <div>
+            <DetailLabel icon={IconPerson}>Persona</DetailLabel>
+            <dd>{snapshot.persona?.title ?? "None"}</dd>
+          </div>
+          <div>
+            <DetailLabel icon={IconFolder}>Environment</DetailLabel>
+            <dd>{snapshot.environment?.title ?? "Empty workspace"}</dd>
+          </div>
+          <div>
+            <DetailLabel icon={IconPlug}>Skills / MCP servers</DetailLabel>
+            <dd>
+              {snapshot.skills.length} / {snapshot.mcps.length}
+            </dd>
+          </div>
+          <div>
+            <DetailLabel icon={IconShuffle}>Intercepted calls</DetailLabel>
+            <dd>{number(session.interceptedCalls)}</dd>
+          </div>
+        </>
+      )}
       <div>
-        <DetailLabel icon={IconFolder}>Environment</DetailLabel>
-        <dd>{snapshot.environment?.title ?? "Empty workspace"}</dd>
-      </div>
-      <div>
-        <DetailLabel icon={IconPlug}>Skills / MCP servers</DetailLabel>
-        <dd>
-          {snapshot.skills.length} / {snapshot.mcps.length}
-        </dd>
-      </div>
-      <div>
-        <DetailLabel icon={IconShuffle}>Intercepted calls</DetailLabel>
-        <dd>{number(session.interceptedCalls)}</dd>
-      </div>
-      <div>
-        <DetailLabel icon={IconCalendar}>Started</DetailLabel>
+        <DetailLabel icon={IconCalendar}>
+          {session.origin === "organic" ? "Judge started" : "Started"}
+        </DetailLabel>
         <dd>
           {session.startedAt
             ? new Date(session.startedAt).toLocaleString()

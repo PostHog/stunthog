@@ -143,10 +143,20 @@ model Session {
   id             String            @id @default(uuid())
   evalId         String
   batchId        String
+  parentSessionId String?
+  rootSessionId String?
+  branchEntryId String?
+  branchRequestId String? @unique
+  promptCheckpointReady Boolean @default(false)
+  checkpointImage String?
+  parent Session? @relation("SessionBranches", fields: [parentSessionId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  branches Session[] @relation("SessionBranches")
   model          String
   harness        String @default("pi")
   status         String
   snapshot       Json
+  origin         String            @default("synthetic")
+  memo           String?
   agentResult    Json?
   judgeResult    Json?
   behaviorDrift  Json?
@@ -169,6 +179,8 @@ model Session {
   artifacts      SessionArtifact[]
 
   @@index([evalId, createdAt])
+  @@index([parentSessionId])
+  @@index([rootSessionId])
   @@index([batchId])
   @@index([status])
 }

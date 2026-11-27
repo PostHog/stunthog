@@ -78,6 +78,7 @@ export class ToolCallsController {
     if (filter.status) conditions.push(Prisma.sql`t.status=${filter.status}`);
     if (filter.sessionId)
       conditions.push(Prisma.sql`t.sessionId=${filter.sessionId}`);
+    else conditions.push(Prisma.sql`s.parentSessionId IS NULL`);
     if (filter.evalId) conditions.push(Prisma.sql`s.evalId=${filter.evalId}`);
     if (filter.before) conditions.push(Prisma.sql`t.id < ${filter.before}`);
     const rows = await this.db.$queryRaw<

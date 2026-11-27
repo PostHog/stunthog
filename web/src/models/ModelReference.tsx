@@ -46,6 +46,10 @@ export function modelDisplayName(model: string): string {
     .replace(/^GPT /, "GPT-");
 }
 
+export function harnessName(harness: string) {
+  return brands[harness]?.title ?? harness;
+}
+
 export function HarnessIcon({ harness }: { harness: string }) {
   const brand = brands[harness];
 

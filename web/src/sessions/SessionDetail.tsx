@@ -5,7 +5,7 @@ import {
   TabsList,
   TabsTrigger,
 } from "@posthog/quill";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api, useApi } from "../api.js";
 import { Notice, PageTitle, Status } from "../components.js";
 import { ModelReference } from "../models/ModelReference.js";
@@ -19,6 +19,11 @@ import { ConfigurationPanel } from "./ConfigurationPanel.js";
 import { FilesPanel } from "./FilesPanel.js";
 import { LogPanel } from "./LogPanel.js";
 import { ModelBehaviorDrift } from "./ModelBehaviorDrift.js";
+import {
+  type BranchRow,
+  SessionBranches,
+  threadLink,
+} from "./SessionBranches.js";
 import { SessionJudgment } from "./SessionJudgment.js";
 import { SessionMetadata } from "./SessionMetadata.js";
 import { isActive } from "./session-filters.js";
@@ -26,13 +31,36 @@ import { TranscriptFilterIcon } from "./transcript/TranscriptFilterIcon.js";
 import { buildTranscript } from "./transcript/transcript.js";
 import { useSessionEvents } from "./useSessionEvents.js";
 
-export function SessionDetail({ id }: { id: string }) {
+const pollBranches = (rows: BranchRow[]) => rows.some(isActive);
+
+export function SessionDetail({
+  id,
+  branch,
+}: {
+  id: string;
+  branch?: string | null;
+}) {
   const {
     data: session,
     error,
     refresh,
-  } = useApi<Session>(`/sessions/${id}`, isActive);
+  } = useApi<Session>(
+    `/sessions/${encodeURIComponent(branch || id)}`,
+    isActive,
+  );
+  useEffect(() => {
+    if (!branch && session?.rootSessionId) {
+      const entry = new URLSearchParams(window.location.hash.split("?")[1]).get(
+        "entry",
+      );
+      window.location.replace(
+        threadLink(session.rootSessionId, session.id, entry ?? undefined),
+      );
+    }
+  }, [branch, session?.rootSessionId, session?.id]);
   if (!session) return <RequestState error={error} retry={refresh} />;
+  if (branch && session.rootSessionId !== id)
+    return <Notice error="This branch belongs to a different session." />;
   return (
     <SessionView
       key={session.id}
@@ -52,10 +80,29 @@ function SessionView({
   refresh: () => void;
 }) {
   const id = session.id;
+  const root = session.rootSessionId ?? id;
+  const family = useApi<BranchRow[]>(
+    `/sessions/${root}/branches`,
+    pollBranches,
+  );
+  const nodes = useMemo(() => {
+    let index = 0;
+    return (family.data ?? []).map((row) => ({
+      ...row,
+      name: row.parentSessionId ? `Branch ${++index}` : "Original",
+    }));
+  }, [family.data]);
+  const current = nodes.find((node) => node.id === id);
   const [tab, setTab] = useState("agent");
   const [failure, setFailure] = useState("");
   const [cancelling, setCancelling] = useState(false);
-  const [jump, setJump] = useState({ callId: "", entryId: "", visit: 0 });
+  const [jump, setJump] = useState({
+    callId: "",
+    entryId:
+      new URLSearchParams(window.location.hash.split("?")[1]).get("entry") ??
+      "",
+    visit: 0,
+  });
   const active = !!session && isActive(session);
   const [judgeOpened, setJudgeOpened] = useState(false);
   const agentTrace = useSessionEvents(id, "agent", !!session, active);
@@ -96,6 +143,11 @@ function SessionView({
     [judgeTrace.events, tab],
   );
 
+  function showEntry(entryId: string) {
+    setJump((current) => ({ callId: "", entryId, visit: current.visit + 1 }));
+    setTab("agent");
+  }
+
   async function cancel() {
     if (
       !confirm(
@@ -119,12 +171,24 @@ function SessionView({
 
   return (
     <div className="session-detail">
-      <a className="back-link" href={`#evals/${session.evalId}`}>
-        {session.eval.title}
-      </a>
+      <div className="session-path">
+        <a className="back-link" href={`#evals/${session.evalId}`}>
+          {session.eval.title}
+        </a>
+        {session.parentSessionId && (
+          <>
+            {" "}
+            / <a href={threadLink(root, root)}>Original session</a>
+          </>
+        )}
+      </div>
       <div className="session-heading">
         <PageTitle
-          title={`${session.harness === "opencode" ? "OpenCode" : session.harness === "claude" ? "Claude Code" : session.harness === "codex" ? "Codex" : "Pi"} session`}
+          title={
+            session.parentSessionId
+              ? (current?.name ?? "Branch")
+              : `${session.harness === "opencode" ? "OpenCode" : session.harness === "claude" ? "Claude Code" : session.harness === "codex" ? "Codex" : "Pi"} session`
+          }
         >
           <Status value={session.status} />
           {active && (
@@ -172,6 +236,8 @@ function SessionView({
                 active={active}
                 phase="agent"
                 entries={agentEntries}
+                branches={nodes}
+                onBranchCreated={family.refresh}
                 error={agentTrace.error || interceptTrace.error}
                 loadOlder={
                   agentTrace.more || agentTrace.error
@@ -197,7 +263,11 @@ function SessionView({
               />
             </TabsContent>
             <TabsContent value="files">
-              <FilesPanel id={id} active={active} />
+              <FilesPanel
+                id={id}
+                active={active}
+                organic={session.origin === "organic"}
+              />
             </TabsContent>
             <TabsContent value="configuration">
               <ConfigurationPanel session={session} />
@@ -210,19 +280,21 @@ function SessionView({
           // biome-ignore lint/a11y/noNoninteractiveTabindex: Keyboard users need to scroll this pane.
           tabIndex={0}
         >
-          <h2>Session details</h2>
+          <Notice error={family.error} />
+          <SessionBranches
+            nodes={nodes}
+            root={root}
+            selected={id}
+            onEntry={showEntry}
+          />
+          <h2>
+            {session.parentSessionId ? "Branch details" : "Session details"}
+          </h2>
           <SessionMetadata session={session} />
           <ModelBehaviorDrift
             session={session}
             entries={agentEntries}
-            onEvidence={(entryId) => {
-              setJump((current) => ({
-                callId: "",
-                entryId,
-                visit: current.visit + 1,
-              }));
-              setTab("agent");
-            }}
+            onEvidence={showEntry}
             onInspect={(callId) => {
               const row = captures.find(
                 (row) =>

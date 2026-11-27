@@ -62,6 +62,88 @@
 .transcript-intro {
   margin-bottom: 8px;
 }
+.branch-start {
+  margin: 2px 0 18px;
+  border: 1px solid var(--border);
+  border-inline-start: 3px solid var(--warning-foreground);
+  border-radius: 5px;
+  background: var(--card);
+}
+.branch-start header,
+.transcript-intro:has(h3) {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+}
+.branch-start header {
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.branch-start h3,
+.transcript-intro h3 {
+  margin: 0;
+  font: 600 13px / 1.5 var(--font-sans);
+}
+.branch-start h3 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.branch-start h3 svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  color: var(--warning-foreground);
+}
+.branch-start header a,
+.branch-start dt {
+  font: 12px / 1.5 var(--font-sans);
+}
+.branch-start dl {
+  margin: 0;
+}
+.branch-start dl > div {
+  padding: 7px 12px;
+}
+.branch-start dt,
+.branch-start em {
+  color: var(--muted-foreground);
+}
+.branch-start dd {
+  margin: 2px 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 32vh;
+  overflow: auto;
+}
+.branch-start [data-edited] {
+  background: color-mix(in srgb, var(--warning-foreground) 6%, transparent);
+}
+.branch-start [data-edited] dt {
+  color: var(--warning-foreground);
+  font-weight: 600;
+}
+.branch-start mark {
+  background: color-mix(
+    in srgb,
+    var(--destructive-foreground) 12%,
+    transparent
+  );
+  color: inherit;
+  text-decoration: line-through;
+}
+.branch-start [data-edited] mark {
+  background: color-mix(in srgb, var(--warning-foreground) 19%, transparent);
+  text-decoration: none;
+}
+.branch-start > p,
+.branch-start > button,
+.branch-start > output {
+  display: inline-block;
+  margin: 5px 12px;
+}
 .transcript-prompt {
   border-inline-start: 1px solid var(--border);
   padding-inline-start: 12px;
@@ -372,4 +454,76 @@
     border-inline-start: 0;
     border-block-start: 1px solid var(--border);
   }
+}
+
+.trace-branch-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+}
+.trace-branch-actions output {
+  color: var(--muted-foreground);
+  font-size: 11px;
+}
+.trace-branch-link {
+  padding: 1px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--info-foreground);
+  font-size: 11px;
+}
+.trace-edit-action {
+  display: block;
+  margin-top: 2px;
+  min-height: 22px;
+  padding: 0 6px;
+  font-size: 11px;
+  color: var(--muted-foreground);
+}
+.trace-edit fieldset {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+.trace-edit-comparison {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+  gap: 16px;
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+  margin-top: 14px;
+}
+.trace-edit-source {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.trace-edit-source code {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.trace-edit-source small {
+  margin-inline-start: auto;
+  color: var(--muted-foreground);
+  white-space: nowrap;
+}
+.trace-edit-comparison section {
+  min-width: 0;
+}
+.trace-edit-comparison pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 32vh;
+  overflow: auto;
+}
+.trace-branch-confirm {
+  border: 1px solid var(--border);
+  padding: 12px;
+  margin-top: 12px;
 }

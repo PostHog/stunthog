@@ -1,6 +1,11 @@
 import { Button } from "@posthog/quill";
 import { useState } from "react";
+import { maxSessionFilesPerUpload } from "../../../src/sessions/domain/session-file.js";
 import type { EvalDraft, Harness } from "../types.js";
+import {
+  LoadSessionDialog,
+  type PendingSessionFile,
+} from "./LoadSessionDialog.js";
 import { defaultModel } from "./ModelPicker.js";
 import { ModelSettingsDialog } from "./ModelSettingsDialog.js";
 import { ModelSummary } from "./ModelSummary.js";
@@ -10,14 +15,18 @@ export function EvalModels<T extends Pick<EvalDraft, "models" | "judge">>({
   onChange,
   harnesses = [],
   saveTarget = "evaluation",
-  showDefaultsLink = false,
+  recordings,
 }: {
   value: T;
   onChange: (value: T) => void;
   harnesses?: Harness[];
   saveTarget?: "evaluation" | "settings";
-  showDefaultsLink?: boolean;
+  recordings?: {
+    files: PendingSessionFile[];
+    onChange: (files: PendingSessionFile[]) => void;
+  };
 }) {
+  const [addingFile, setAddingFile] = useState(false);
   const [editing, setEditing] = useState<number | "new" | "judge" | null>(null);
 
   return (
@@ -25,38 +34,66 @@ export function EvalModels<T extends Pick<EvalDraft, "models" | "judge">>({
       <section className="eval-model-section">
         <div className="section-heading">
           <h2>
-            Session models{" "}
-            <span className="muted">({value.models.length})</span>
+            {recordings ? (
+              "Agent sessions"
+            ) : (
+              <>
+                Session models{" "}
+                <span className="muted">({value.models.length})</span>
+              </>
+            )}
           </h2>
-          <Button
-            type="button"
-            variant="outline"
-            disabled={!harnesses.length}
-            onClick={() => setEditing("new")}
-          >
-            Add model
-          </Button>
+          <div className="actions">
+            {recordings && (
+              <Button
+                type="button"
+                variant="outline"
+                disabled={recordings.files.length >= maxSessionFilesPerUpload}
+                onClick={() => setAddingFile(true)}
+              >
+                Load session file
+              </Button>
+            )}
+            <Button
+              type="button"
+              variant="outline"
+              disabled={!harnesses.length}
+              onClick={() => setEditing("new")}
+            >
+              Add model
+            </Button>
+          </div>
         </div>
         <p className="muted">
-          {showDefaultsLink ? (
+          {recordings ? (
             <>
-              Models and judge start from your{" "}
+              Load files for organic sessions. Add models for synthetic
+              sessions. Models and judge start from your{" "}
               <a href="#settings">evaluation defaults</a>.
             </>
           ) : (
             "Choose the models that will perform the task."
           )}
         </p>
-        {!value.models.length && (
+        {!value.models.length && !recordings?.files.length && (
           <div className="model-selection-empty">
-            <strong>No models selected</strong>
-            <p>Add at least one model to run this evaluation.</p>
+            <strong>
+              {recordings ? "No sessions selected" : "No models selected"}
+            </strong>
+            <p>
+              {saveTarget === "settings"
+                ? "Add a model to use it in new evaluations."
+                : recordings
+                  ? "Load a session file or add a model."
+                  : "Add a model to run synthetic sessions."}
+            </p>
           </div>
         )}
         <div className="model-summary-list">
           {value.models.map((model, index) => (
             <ModelSummary
               key={`${index}-${model.harness}`}
+              synthetic={!!recordings}
               value={model}
               label={`Edit model configuration ${index + 1}`}
               onEdit={() => setEditing(index)}
@@ -70,7 +107,41 @@ export function EvalModels<T extends Pick<EvalDraft, "models" | "judge">>({
               }
             />
           ))}
+          {recordings?.files.map(({ file, memo, id }) => (
+            <div className="model-summary ph-no-capture" key={id}>
+              <div className="model-summary-info">
+                <strong>{file.name}</strong>
+                <p className="muted">Organic{memo && <> · {memo}</>}</p>
+              </div>
+              <Button
+                type="button"
+                aria-label={`Remove ${file.name}`}
+                onClick={() =>
+                  recordings.onChange(
+                    recordings.files.filter((entry) => entry.id !== id),
+                  )
+                }
+              >
+                Remove
+              </Button>
+            </div>
+          ))}
         </div>
+        {recordings && recordings.files.length >= maxSessionFilesPerUpload && (
+          <p className="muted">
+            You can load more files after you save the evaluation.
+          </p>
+        )}
+        {recordings && addingFile && (
+          <LoadSessionDialog
+            stage
+            onClose={() => setAddingFile(false)}
+            onLoad={(entry) => {
+              recordings.onChange([...recordings.files, entry]);
+              setAddingFile(false);
+            }}
+          />
+        )}
       </section>
       <section className="eval-model-section">
         <div className="section-heading">

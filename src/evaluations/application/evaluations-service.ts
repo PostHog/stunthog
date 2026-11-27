@@ -59,7 +59,12 @@ export class EvaluationsService {
     return entity;
   }
 
-  async save(input: unknown, id?: string) {
+  async save(
+    input: unknown,
+    id?: string,
+    persist: (entity: Evaluation) => Promise<unknown> = (entity) =>
+      this.repository.save(entity),
+  ) {
     const value = inputSchema.parse(input);
     const judgeMcpIds = [...new Set(value.judgeMcpIds)];
     // Judge MCP tools are auto-approved, so the author must name each one the judge may call.
@@ -108,7 +113,7 @@ export class EvaluationsService {
       entity.revise(data);
     }
 
-    await this.repository.save(entity);
+    await persist(entity);
     this.analytics?.capture(id ? "evaluation updated" : "evaluation created", {
       evaluation_id: entity.snapshot().id,
       criteria_count: data.criteria.length,

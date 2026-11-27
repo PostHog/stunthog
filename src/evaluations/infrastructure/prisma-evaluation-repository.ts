@@ -1,7 +1,7 @@
 import { Inject, Injectable } from "@nestjs/common";
 import type { Prisma } from "@prisma/client";
 import { Database } from "../../infrastructure/database.js";
-import { Evaluation } from "../domain/evaluation.js";
+import { Evaluation, type EvaluationData } from "../domain/evaluation.js";
 import { EvaluationRepository } from "../domain/evaluation-repository.js";
 
 @Injectable()
@@ -60,35 +60,7 @@ export class PrismaEvaluationRepository extends EvaluationRepository {
 
   async save(evaluation: Evaluation): Promise<void> {
     const data = evaluation.snapshot();
-    const values = {
-      responseOverrides: data.responseOverrides ?? [],
-      title: data.title,
-      prompt: data.prompt,
-      revision: data.revision,
-      environmentId: data.environmentId,
-      personaId: data.personaId,
-      judge: data.judge as unknown as Prisma.InputJsonValue,
-      criteria: {
-        create: data.criteria.map((criterion, position) => ({
-          ...criterion,
-          position,
-        })),
-      },
-      models: {
-        create: data.models.map((model, position) => ({ ...model, position })),
-      },
-      skills: { create: data.skillIds.map((skillId) => ({ skillId })) },
-      mcps: { create: data.mcpIds.map((mcpId) => ({ mcpId })) },
-      judgeSkills: {
-        create: data.judgeSkillIds.map((skillId) => ({ skillId })),
-      },
-      judgeMcps: {
-        create: data.judgeMcpIds.map((mcpId) => ({
-          mcpId,
-          allowedTools: data.judgeMcpTools[mcpId] ?? [],
-        })),
-      },
-    };
+    const values = evaluationValues(data);
 
     await this.db.$transaction(async (tx) => {
       if (data.revision === 1) {
@@ -110,4 +82,36 @@ export class PrismaEvaluationRepository extends EvaluationRepository {
       await tx.eval.update({ where: { id: data.id }, data: values });
     });
   }
+}
+
+export function evaluationValues(data: EvaluationData) {
+  return {
+    responseOverrides: data.responseOverrides ?? [],
+    title: data.title,
+    prompt: data.prompt,
+    revision: data.revision,
+    environmentId: data.environmentId,
+    personaId: data.personaId,
+    judge: data.judge as unknown as Prisma.InputJsonValue,
+    criteria: {
+      create: data.criteria.map((criterion, position) => ({
+        ...criterion,
+        position,
+      })),
+    },
+    models: {
+      create: data.models.map((model, position) => ({ ...model, position })),
+    },
+    skills: { create: data.skillIds.map((skillId) => ({ skillId })) },
+    mcps: { create: data.mcpIds.map((mcpId) => ({ mcpId })) },
+    judgeSkills: {
+      create: data.judgeSkillIds.map((skillId) => ({ skillId })),
+    },
+    judgeMcps: {
+      create: data.judgeMcpIds.map((mcpId) => ({
+        mcpId,
+        allowedTools: data.judgeMcpTools[mcpId] ?? [],
+      })),
+    },
+  };
 }

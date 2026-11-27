@@ -8,12 +8,20 @@ import { EmptyState, LoadingState, RequestState } from "../PageState.js";
 import type { Artifact } from "../types.js";
 import { FilePreview } from "./FilePreview.js";
 
-export function FilesPanel({ id, active }: { id: string; active: boolean }) {
+export function FilesPanel({
+  id,
+  active,
+  organic = false,
+}: {
+  id: string;
+  active: boolean;
+  organic?: boolean;
+}) {
   const { data, error, refresh } = useApi<Artifact[]>(
     `/sessions/${id}/files`,
     active,
   );
-  const [phase, setPhase] = useState("output");
+  const [phase, setPhase] = useState(organic ? "session-file" : "output");
   const [selected, setSelected] = useState<Artifact>();
   const [text, setText] = useState<string>();
   const [failure, setFailure] = useState("");
@@ -91,9 +99,16 @@ export function FilesPanel({ id, active }: { id: string; active: boolean }) {
               if (same) void read(same);
             }}
             options={[
-              { value: "input", label: "Original input" },
-              { value: "output", label: "Final workspace" },
-              { value: "agent-runtime", label: "Agent runtime" },
+              ...(organic
+                ? [{ value: "session-file", label: "Session file" }]
+                : [
+                    { value: "input", label: "Original input" },
+                    { value: "output", label: "Final workspace" },
+                    { value: "agent-runtime", label: "Agent runtime" },
+                  ]),
+              ...(data?.some((file) => file.phase === "branch-context")
+                ? [{ value: "branch-context", label: "Session background" }]
+                : []),
               { value: "judge-runtime", label: "Judge runtime" },
             ]}
           />

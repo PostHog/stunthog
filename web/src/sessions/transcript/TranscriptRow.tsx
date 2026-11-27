@@ -41,11 +41,15 @@ export function TranscriptRow({
   onOverride,
   editing = false,
   revealResult = false,
+  foldPrompt = false,
+  editAction,
   children,
 }: {
   entry: TranscriptEntry;
   editing?: boolean;
   revealResult?: boolean;
+  foldPrompt?: boolean;
+  editAction?: ReactNode;
   children?: ReactNode;
   onOverride?: (capture: ResponseCapture, selection: string) => void;
   matches?: TranscriptMatches | undefined;
@@ -208,6 +212,18 @@ export function TranscriptRow({
             <Markdown text={entry.text} matches={matches?.text} />
           </CollapsibleContent>
         </Collapsible>
+      ) : foldPrompt ? (
+        <Collapsible
+          key={matches?.text ? "match" : "idle"}
+          defaultOpen={Boolean(matches?.text)}
+        >
+          <CollapsibleTrigger>
+            Starting prompt and edited transcript
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <Markdown text={entry.text} matches={matches?.text} />
+          </CollapsibleContent>
+        </Collapsible>
       ) : entry.kind === "system" ? (
         <p className="transcript-error">
           <Highlighted text={entry.title} ranges={matches?.title} />{" "}
@@ -216,6 +232,7 @@ export function TranscriptRow({
       ) : (
         <Markdown text={entry.text} matches={matches?.text} />
       )}
+      {editAction}
     </article>
   );
 }

@@ -52,6 +52,12 @@ export interface Decision {
   feedback: string;
 }
 export interface Session {
+  parentSessionId?: string | null;
+  rootSessionId?: string | null;
+  branchEntryId?: string | null;
+  branchCount?: number;
+  origin: "organic" | "synthetic";
+  memo: string | null;
   behaviorDrift?: DriftFinding[] | null;
   interceptedCalls: number;
   id: string;
