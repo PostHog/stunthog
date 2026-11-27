@@ -85,8 +85,7 @@ function evaluation() {
 
 test("a new evaluation can stage files alongside models and save with only organic sessions", async () => {
   const oldFetch = globalThis.fetch;
-  const previousLocation = globalThis.location;
-  Object.assign(globalThis, { location: window.location });
+  const previousUrl = window.location.href;
   const submissions: FormData[] = [];
   globalThis.fetch = async (url, options) => {
     if (String(url).startsWith("/api/settings?"))
@@ -156,7 +155,7 @@ test("a new evaluation can stage files alongside models and save with only organ
   } finally {
     cleanup();
     globalThis.fetch = oldFetch;
-    Object.assign(globalThis, { location: previousLocation });
+    window.history.replaceState(null, "", previousUrl);
   }
 });
 

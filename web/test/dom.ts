@@ -6,6 +6,7 @@ const dom = new JSDOM("<!doctype html><html><body></body></html>", {
 
 Object.assign(globalThis, {
   window: dom.window,
+  location: dom.window.location,
   document: dom.window.document,
   Window: dom.window.Window,
   HTMLElement: dom.window.HTMLElement,
